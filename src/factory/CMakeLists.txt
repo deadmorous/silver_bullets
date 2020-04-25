@@ -1,6 +1,7 @@
 cmake_minimum_required (VERSION 3.1.3) 
 
-project(factory)
+get_filename_component(ProjectId ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+project(${ProjectId})
 
 file(GLOB HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/*.hpp
@@ -15,4 +16,7 @@ set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY
 )
 
 
-install(TARGETS factory DESTINATION lib)
+install(TARGETS ${PROJECT_NAME} DESTINATION lib)
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/../../include/${PROJECT_NAME} DESTINATION include)
+install(FILES ${PROJECT_SOURCE_DIR}/../../cmake/FindFactory.cmake DESTINATION cmake)
+

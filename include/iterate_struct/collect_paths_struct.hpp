@@ -1,6 +1,6 @@
 #pragma once
 
-#include "iterate_struct.h"
+#include "iterate_struct.hpp"
 
 #include <vector>
 #include <boost/lexical_cast.hpp>

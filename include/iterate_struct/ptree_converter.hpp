@@ -1,7 +1,7 @@
 #pragma once
 
 #include <iostream>
-#include "iterate_struct.h"
+#include "iterate_struct.hpp"
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/lexical_cast.hpp>

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "iterate_struct.h"
+#include "iterate_struct.hpp"
 #include <ostream>
 
-#include "enum_names/enum_names.h"
+#include "enum_names/enum_names.hpp"
 
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/join.hpp>

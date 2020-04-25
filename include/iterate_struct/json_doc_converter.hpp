@@ -1,13 +1,13 @@
 #pragma once
 
 #include <iostream>
-#include "iterate_struct.h"
+#include "iterate_struct.hpp"
 
 #include <rapidjson/document.h>
 #include <list>
 #include <boost/assert.hpp>
 
-#include "enum_names/enum_names.h"
+#include "enum_names/enum_names.hpp"
 
 namespace iterate_struct {
 

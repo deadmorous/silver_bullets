@@ -1,7 +1,7 @@
 #include <iostream>
 #include <utility>
 
-#include "templatize/resolve_template_args.h"
+#include "templatize/resolve_template_args.hpp"
 
 
 using namespace std;

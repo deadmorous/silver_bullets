@@ -1,10 +1,10 @@
-#include "iterate_struct/iterate_struct.h"
-#include "iterate_struct/value_printer.h"
-#include "iterate_struct/ptree_converter.h"
-#include "iterate_struct/json_doc_converter.h"
-#include "iterate_struct/json_doc_io.h"
-#include "iterate_struct/collect_paths_struct.h"
-#include "iterate_struct/collect_paths_json_doc.h"
+#include "iterate_struct/iterate_struct.hpp"
+#include "iterate_struct/value_printer.hpp"
+#include "iterate_struct/ptree_converter.hpp"
+#include "iterate_struct/json_doc_converter.hpp"
+#include "iterate_struct/json_doc_io.hpp"
+#include "iterate_struct/collect_paths_struct.hpp"
+#include "iterate_struct/collect_paths_json_doc.hpp"
 
 #include <boost/property_tree/json_parser.hpp>
 #include <rapidjson/pointer.h>
