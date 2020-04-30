@@ -123,11 +123,11 @@ int main()
     iterate_struct::print(cout, bar3);
 
     cout << "Paths collected from Foo" << endl;
-    for (auto& path : iterate_struct::collect_paths(bar3))
+    for (auto& path : iterate_struct::collect_paths(bar3, true))
         cout << path << endl;
 
     cout << "Paths collected from JSON (rapidjson)" << endl;
-    for (auto& path : iterate_struct::collect_paths(jsdoc))
+    for (auto& path : iterate_struct::collect_paths(jsdoc, true))
         cout << path << endl;
 
 
@@ -140,9 +140,14 @@ int main()
     });
     auto containers = iterate_struct::from_json_doc<Containers>(jsdc);
     cout << endl << "Paths from a Containers instance:" << endl;
-    for (auto& path : iterate_struct::collect_paths(containers))
+    for (auto& path : iterate_struct::collect_paths(containers, false))
         cout << path << endl;
-    iterate_struct::print(cout, containers);
+    cout << endl << "Paths from the JSON doc for the same Containers instance:" << endl;
+    for (auto& path : iterate_struct::collect_paths(jsdc, false))
+        cout << path << endl;
+    iterate_struct::print(cout, containers, [](const std::string& path) {
+        cout << " ========= " << path;
+    });
 
     return 0;
 }

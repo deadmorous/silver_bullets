@@ -34,7 +34,8 @@ public:
     template <class T>
     void print(const T& x) const
     {
-        print_priv(x, true);
+        if (print_priv(x, true))
+            m_s << std::endl;
     }
 
 private:
@@ -56,7 +57,7 @@ private:
     {
         maybePad(needPad);
         m_s << x;
-        if (!needPad && m_cb)
+        if (m_cb)
             m_cb(current_path());
         return true;
     }
@@ -81,6 +82,9 @@ private:
             scoped_inc scinc(m_depth);
             for_each(x, *this);
         }
+        if (m_cb)
+            m_cb(current_path());
+        m_s << std::endl;
         return false;
     }
 
@@ -89,25 +93,19 @@ private:
     {
         maybePad(needPad);
         m_s << "[" << std::endl;
-        auto leaves = true;
         {
             scoped_inc scinc(m_depth);
             for (std::size_t i=0, n=x.size(); i<n; ++i) {
                 auto& xi = x[i];
                 m_current_path_items.push_back(boost::lexical_cast<std::string>(i));
-                if (!print_priv(xi, true))
-                    leaves = false;
-
-                // Separate aggregate array items with an extra newline
-                if (leaves || i+1<n)
+                if (print_priv(xi, true))
                     m_s << std::endl;
-
                 m_current_path_items.pop_back();
             }
         }
         maybePad(true);
         m_s << ']';
-        if (leaves && m_cb)
+        if (m_cb)
             m_cb(current_path());
         m_s << std::endl;
         return false;
@@ -118,24 +116,20 @@ private:
     {
         maybePad(needPad);
         m_s << "[" << std::endl;
-        auto leaves = true;
         {
             scoped_inc scinc(m_depth);
             m_current_path_items.push_back("0");
-            if (!print_priv(x.first, true))
-                leaves = false;
-            m_current_path_items.pop_back();
-            m_s << std::endl;
-            m_current_path_items.push_back("1");
-            if (!print_priv(x.second, true))
-                leaves = false;
-            m_current_path_items.pop_back();
-            if (leaves)
+            if (print_priv(x.first, true))
                 m_s << std::endl;
+            m_current_path_items.pop_back();
+            m_current_path_items.push_back("1");
+            if (print_priv(x.second, true))
+                m_s << std::endl;
+            m_current_path_items.pop_back();
         }
         maybePad(true);
         m_s << ']';
-        if (leaves && m_cb)
+        if (m_cb)
             m_cb(current_path());
         m_s << std::endl;
         return false;
@@ -146,27 +140,18 @@ private:
     {
         maybePad(needPad);
         m_s << "{" << std::endl;
-        auto leaves = true;
         {
             scoped_inc scinc(m_depth);
-            std::size_t i = 0;
-            std::size_t n = x.size();
             for (auto& item : x) {
                 m_current_path_items.push_back(boost::lexical_cast<std::string>(item.first));
-                if (!print_priv(item.second, true))
-                    leaves = false;
-
-                // Separate aggregate map items with an extra newline
-                if (leaves || i+1<n)
+                if (print_priv(item.second, true))
                     m_s << std::endl;
-
                 m_current_path_items.pop_back();
-                ++i;
             }
         }
         maybePad(true);
         m_s << '}';
-        if (leaves && m_cb)
+        if (m_cb)
             m_cb(current_path());
         m_s << std::endl;
         return false;
