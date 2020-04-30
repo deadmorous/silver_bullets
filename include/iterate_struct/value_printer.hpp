@@ -113,6 +113,65 @@ private:
         return false;
     }
 
+    template<class T1, class T2>
+    bool print_priv(const std::pair<T1, T2>& x, bool needPad) const
+    {
+        maybePad(needPad);
+        m_s << "[" << std::endl;
+        auto leaves = true;
+        {
+            scoped_inc scinc(m_depth);
+            m_current_path_items.push_back("0");
+            if (!print_priv(x.first, true))
+                leaves = false;
+            m_current_path_items.pop_back();
+            m_s << std::endl;
+            m_current_path_items.push_back("1");
+            if (!print_priv(x.second, true))
+                leaves = false;
+            m_current_path_items.pop_back();
+            if (leaves)
+                m_s << std::endl;
+        }
+        maybePad(true);
+        m_s << ']';
+        if (leaves && m_cb)
+            m_cb(current_path());
+        m_s << std::endl;
+        return false;
+    }
+
+    template<class T1, class T2>
+    bool print_priv(const std::map<T1, T2>& x, bool needPad) const
+    {
+        maybePad(needPad);
+        m_s << "{" << std::endl;
+        auto leaves = true;
+        {
+            scoped_inc scinc(m_depth);
+            std::size_t i = 0;
+            std::size_t n = x.size();
+            for (auto& item : x) {
+                m_current_path_items.push_back(boost::lexical_cast<std::string>(item.first));
+                if (!print_priv(item.second, true))
+                    leaves = false;
+
+                // Separate aggregate map items with an extra newline
+                if (leaves || i+1<n)
+                    m_s << std::endl;
+
+                m_current_path_items.pop_back();
+                ++i;
+            }
+        }
+        maybePad(true);
+        m_s << '}';
+        if (leaves && m_cb)
+            m_cb(current_path());
+        m_s << std::endl;
+        return false;
+    }
+
     void maybePad(bool needPad) const
     {
         if (needPad)

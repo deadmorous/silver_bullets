@@ -142,6 +142,7 @@ int main()
     cout << endl << "Paths from a Containers instance:" << endl;
     for (auto& path : iterate_struct::collect_paths(containers))
         cout << path << endl;
+    iterate_struct::print(cout, containers);
 
     return 0;
 }
