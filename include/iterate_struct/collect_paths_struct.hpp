@@ -70,13 +70,30 @@ private:
     void collect_priv(const std::vector<T>& x) const
     {
         for (std::size_t i=0, n=x.size(); i<n; ++i) {
-            if (is_leaf(x))
-                m_paths.push_back(current_path());
-            else {
-                m_current_path_items.push_back(boost::lexical_cast<std::string>(i));
-                collect_priv(x[i]);
-                m_current_path_items.pop_back();
-            }
+            m_current_path_items.push_back(boost::lexical_cast<std::string>(i));
+            collect_priv(x[i]);
+            m_current_path_items.pop_back();
+        }
+    }
+
+    template<class T1, class T2>
+    void collect_priv(const std::pair<T1, T2>& x) const
+    {
+        m_current_path_items.push_back("0");
+        collect_priv(x.first);
+        m_current_path_items.pop_back();
+        m_current_path_items.push_back("1");
+        collect_priv(x.second);
+        m_current_path_items.pop_back();
+    }
+
+    template<class T1, class T2>
+    void collect_priv(const std::map<T1, T2>& x) const
+    {
+        for (auto& item : x) {
+            m_current_path_items.push_back(boost::lexical_cast<std::string>(item.first));
+            collect_priv(item.second);
+            m_current_path_items.pop_back();
         }
     }
 

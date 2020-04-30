@@ -139,6 +139,9 @@ int main()
             { { 1, 3 }, {5,8}, {91, 42} } // map_int_int
     });
     auto containers = iterate_struct::from_json_doc<Containers>(jsdc);
+    cout << endl << "Paths from a Containers instance:" << endl;
+    for (auto& path : iterate_struct::collect_paths(containers))
+        cout << path << endl;
 
     return 0;
 }
