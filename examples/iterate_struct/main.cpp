@@ -10,6 +10,7 @@
 #include <rapidjson/pointer.h>
 
 #include <iostream>
+#include <map>
 
 // Example of usage
 
@@ -53,6 +54,29 @@ DESCRIBE_STRUCTURE_FIELDS(my::Bar, x, foo)
 // DESCRIBE_TEMPLATE_STRUCTURE_FIELDS(((class, T), (int, i)), WP, x)
 
 DESCRIBE_TEMPLATE_STRUCTURE_FIELDS(((class, T), (int, i)), my::WP2, x)
+
+
+
+using namespace std;
+
+struct Containers
+{
+    vector<string> v_str;
+    pair<int, string> pair_int_str;
+    pair<string, vector<string>> pair_str_v_str;
+    map<string, vector<string>> map_str_v_str;
+    map<int, int> map_int_int;
+};
+
+DESCRIBE_STRUCTURE_FIELDS(
+        Containers
+        , v_str
+        , pair_int_str
+        , pair_str_v_str
+        , map_str_v_str
+        , map_int_int
+        )
+
 
 using namespace std;
 
@@ -105,6 +129,16 @@ int main()
     cout << "Paths collected from JSON (rapidjson)" << endl;
     for (auto& path : iterate_struct::collect_paths(jsdoc))
         cout << path << endl;
+
+
+    auto jsdc = iterate_struct::to_json_doc(Containers{
+            {"a", "s", "d"},    // v_str;
+            {1, "a"},           // pair_int_str;
+            { "qwe", {"a", "s", "d"} }, // pair_str_v_str;
+            { { "a", {"s", "d"}}, {"q", {"w", "e"}} },  // map_str_v_str;
+            { { 1, 3 }, {5,8}, {91, 42} } // map_int_int
+    });
+    auto containers = iterate_struct::from_json_doc<Containers>(jsdc);
 
     return 0;
 }

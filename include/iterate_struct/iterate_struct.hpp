@@ -4,6 +4,7 @@
 #include <functional>
 #include <type_traits>
 #include <vector>
+#include <map>
 #include <boost/preprocessor/seq/for_each.hpp>
 #include <boost/preprocessor/variadic/to_seq.hpp>
 #include <boost/preprocessor/comma_if.hpp>
@@ -79,6 +80,24 @@ struct is_vector<std::vector<T>> : std::true_type {};
 
 template<class T>
 constexpr auto is_vector_v = is_vector<T>::value;
+
+template<class T>
+struct is_pair : std::false_type {};
+
+template<class T1, class T2>
+struct is_pair<std::pair<T1, T2>> : std::true_type {};
+
+template<class T>
+constexpr auto is_pair_v = is_pair<T>::value;
+
+template<class T>
+struct is_map : std::false_type {};
+
+template<class T1, class T2>
+struct is_map<std::map<T1, T2>> : std::true_type {};
+
+template<class T>
+constexpr auto is_map_v = is_map<T>::value;
 
 template <class NamedFieldVisitor>
 struct IndexedFieldVisitor

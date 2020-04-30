@@ -81,6 +81,27 @@ private:
         return result;
     }
 
+    template<class T1, class T2>
+    rapidjson::Value generate_priv(const std::pair<T1, T2>& x) const
+    {
+        rapidjson::Value result(rapidjson::kArrayType);
+        result.PushBack(std::move(generate_priv(x.first)), m_doc.GetAllocator());
+        result.PushBack(std::move(generate_priv(x.second)), m_doc.GetAllocator());
+        return result;
+    }
+
+    template<class T1, class T2>
+    rapidjson::Value generate_priv(const std::map<T1, T2>& x) const
+    {
+        rapidjson::Value result(rapidjson::kObjectType);
+        for (auto& item : x)
+            result.AddMember(
+                        rapidjson::Value(boost::lexical_cast<std::string>(item.first).c_str(), m_doc.GetAllocator()),
+                        generate_priv(item.second),
+                        m_doc.GetAllocator());
+        return result;
+    }
+
     mutable rapidjson::Document m_doc;
     mutable std::list<rapidjson::Value> m_nodes;
 };
@@ -190,6 +211,33 @@ private:
         for (auto& val : array) {
             result.emplace_back(parse_priv<typename T::value_type>(val));
         }
+        return result;
+    }
+
+    template <class T, std::enable_if_t<is_pair_v<T>, int> = 0>
+    T parse_priv(const rapidjson::Value& node) const
+    {
+        if (!node.IsArray())
+            throw std::runtime_error("Value in JSON document has an invalid type, expected an array");
+        auto array = node.GetArray();
+        if (array.Size() != 2)
+            throw std::runtime_error("Value in JSON document is an array of an invalid length, expected length 2");
+        return T {
+            parse_priv<typename T::first_type>(array[0]),
+            parse_priv<typename T::second_type>(array[1])
+        };
+    }
+
+    template <class T, std::enable_if_t<is_map_v<T>, int> = 0>
+    T parse_priv(const rapidjson::Value& node) const
+    {
+        T result;
+        if (!node.IsObject())
+            throw std::runtime_error("Value in JSON document has an invalid type, expected an object");
+        auto object = node.GetObject();
+        for (auto& member : object)
+            result[boost::lexical_cast<typename T::key_type>(member.name.GetString())] =
+                    parse_priv<typename T::mapped_type>(member.value);
         return result;
     }
 
