@@ -1,3 +1,5 @@
+#include "use_iterate_struct.hpp"
+
 #include "iterate_struct/iterate_struct.hpp"
 #include "iterate_struct/value_printer.hpp"
 #include "iterate_struct/ptree_converter.hpp"
@@ -80,8 +82,10 @@ DESCRIBE_STRUCTURE_FIELDS(
 
 using namespace std;
 
-int main()
+void use_iterate_struct()
 {
+    cout << "\n********** use_iterate_struct() **********" << endl;
+
     using namespace my;
     Foo foo;
     auto t = iterate_struct::asTuple(foo);
@@ -148,6 +152,4 @@ int main()
     iterate_struct::print(cout, containers, [](const std::string& path) {
         cout << " ========= " << path;
     });
-
-    return 0;
 }

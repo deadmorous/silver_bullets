@@ -11,25 +11,27 @@
 
 namespace iterate_struct {
 
-class json_doc_generator
+class json_generator
 {
 public:
+    json_generator(rapidjson::Document::AllocatorType& allocator) :
+        m_allocator(allocator)
+    {
+    }
+
     template<class T>
     inline void operator()(T& value, const char *name) const
     {
         m_nodes.back().AddMember(
-                    rapidjson::Value(name, m_doc.GetAllocator()),
+                    rapidjson::Value(name, m_allocator),
                     generate_priv(value),
-                    m_doc.GetAllocator());
+                    m_allocator);
     }
 
     template<class T>
-    static rapidjson::Document generate(const T& value)
+    static rapidjson::Value generate(const T& value, rapidjson::Document::AllocatorType& allocator)
     {
-        json_doc_generator generator;
-        rapidjson::Value val = generator.generate_priv(value);
-        generator.m_doc.Swap(val);
-        return std::move(generator.m_doc);
+        return json_generator(allocator).generate_priv(value);
     }
 
 private:
@@ -41,7 +43,7 @@ private:
     rapidjson::Value generate_priv(const T& x) const
     {
         rapidjson::Value result;
-        result.Set(x, m_doc.GetAllocator());
+        result.Set(x, m_allocator);
         return result;
     }
 
@@ -51,14 +53,14 @@ private:
     rapidjson::Value generate_priv(const T& x) const
     {
         rapidjson::Value result;
-        result.SetString(enum_item_name(x), m_doc.GetAllocator());
+        result.SetString(enum_item_name(x), m_allocator);
         return result;
     }
 
     rapidjson::Value generate_priv(const std::string& x) const
     {
         rapidjson::Value result;
-        result.SetString(x.c_str(), m_doc.GetAllocator());
+        result.SetString(x.c_str(), m_allocator);
         return result;
     }
 
@@ -77,7 +79,7 @@ private:
     {
         rapidjson::Value result(rapidjson::kArrayType);
         for (std::size_t i=0, n=x.size(); i<n; ++i)
-            result.PushBack(std::move(generate_priv(x[i])), m_doc.GetAllocator());
+            result.PushBack(std::move(generate_priv(x[i])), m_allocator);
         return result;
     }
 
@@ -85,8 +87,8 @@ private:
     rapidjson::Value generate_priv(const std::pair<T1, T2>& x) const
     {
         rapidjson::Value result(rapidjson::kArrayType);
-        result.PushBack(std::move(generate_priv(x.first)), m_doc.GetAllocator());
-        result.PushBack(std::move(generate_priv(x.second)), m_doc.GetAllocator());
+        result.PushBack(std::move(generate_priv(x.first)), m_allocator);
+        result.PushBack(std::move(generate_priv(x.second)), m_allocator);
         return result;
     }
 
@@ -96,24 +98,34 @@ private:
         rapidjson::Value result(rapidjson::kObjectType);
         for (auto& item : x)
             result.AddMember(
-                        rapidjson::Value(boost::lexical_cast<std::string>(item.first).c_str(), m_doc.GetAllocator()),
+                        rapidjson::Value(boost::lexical_cast<std::string>(item.first).c_str(), m_allocator),
                         generate_priv(item.second),
-                        m_doc.GetAllocator());
+                        m_allocator);
         return result;
     }
 
-    mutable rapidjson::Document m_doc;
+    rapidjson::Document::AllocatorType& m_allocator;
     mutable std::list<rapidjson::Value> m_nodes;
 };
 
 template<class T>
-inline rapidjson::Document to_json_doc(const T& value) {
-    return json_doc_generator::generate(value);
+inline rapidjson::Value to_json(const T& value, rapidjson::Document::AllocatorType& allocator)
+{
+    return json_generator::generate(value, allocator);
+}
+
+template<class T>
+inline rapidjson::Document to_json_doc(const T& value)
+{
+    rapidjson::Document doc;
+    auto val = to_json(value, doc.GetAllocator());
+    doc.Swap(val);
+    return doc;
 }
 
 
 
-class json_doc_parser
+class json_parser
 {
 public:
     template<class T>
@@ -128,8 +140,8 @@ public:
     }
 
     template<class T>
-    static T parse(const rapidjson::Document& document) {
-        return json_doc_parser().parse_priv<T>(document);
+    static T parse(const rapidjson::Value& value) {
+        return json_parser().parse_priv<T>(value);
     }
 
 private:
@@ -245,8 +257,13 @@ private:
 };
 
 template<class T>
+inline T from_json(const rapidjson::Value& value) {
+    return json_parser::parse<T>(value);
+}
+
+template<class T>
 inline T from_json_doc(const rapidjson::Document& document) {
-    return json_doc_parser::parse<T>(document);
+    return from_json<T>(document);
 }
 
 } // namespace iterate_struct

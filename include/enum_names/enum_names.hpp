@@ -55,10 +55,10 @@ constexpr boost::iterator_range<const std::pair<E, const char*>*> enum_item_rang
     return { enum_item_begin<E>(), enum_item_end<E>() };
 }
 
-#define DQR_BEGIN_DEFINE_ENUM_NAMES(EnumClassType) \
+#define CTM_BEGIN_DEFINE_ENUM_NAMES(EnumClassType) \
     template<> struct enum_names<EnumClassType> { \
         static constexpr const std::pair<EnumClassType, const char*> names[] = {
 
-#define DQR_END_DEFINE_ENUM_NAMES() \
+#define CTM_END_DEFINE_ENUM_NAMES() \
         }; \
     };

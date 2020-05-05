@@ -5,7 +5,6 @@
 #include <boost/lexical_cast.hpp>
 
 #include <rapidjson/document.h>
-// #include <rapidjson/writer.h>
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/ostreamwrapper.h>
 #include <rapidjson/istreamwrapper.h>
@@ -25,7 +24,7 @@ inline rapidjson::Document read_json_doc(const std::string& fileName)
     std::ifstream is(fileName);
     if (!is.is_open())
         throw std::runtime_error(std::string("Failed to open input file '")+fileName+"'");
-    // is.exceptions (std::ifstream::failbit | std::ifstream::badbit);
+    is.exceptions (std::ifstream::failbit | std::ifstream::badbit);
     return read_json_doc(is);
 }
 
