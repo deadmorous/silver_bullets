@@ -18,7 +18,7 @@ class ConfigLoader
 public:
     static std::string findConfigFile(const std::string& name)
     {
-        using namespace STD_FILESYSTEM_NAMESPACE;
+        using namespace std::filesystem;
         if (exists(name))
             return current_path() / name;
         else {

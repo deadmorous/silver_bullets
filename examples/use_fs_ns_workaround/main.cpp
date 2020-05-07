@@ -8,7 +8,7 @@ using namespace std;
 int main(int /*argc*/, char **argv)
 {
     try {
-        auto ok = STD_FILESYSTEM_NAMESPACE::exists(argv[0]);
+        auto ok = filesystem::exists(argv[0]);
         cout << "exists('" << argv[0] << "') returned " << boolalpha << ok << endl;
         return EXIT_SUCCESS;
     }
