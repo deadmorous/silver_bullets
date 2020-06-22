@@ -8,4 +8,5 @@ add_subdirectory(trie)
 add_subdirectory(fs_ns_workaround)
 add_subdirectory(sb_os)
 add_subdirectory(sync)
+add_subdirectory(parallel)
 
