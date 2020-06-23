@@ -6,6 +6,6 @@ add_subdirectory(use_factory)
 add_subdirectory(use_trie)
 add_subdirectory(use_fs_ns_workaround)
 add_subdirectory(use_sb_os)
-add_subdirectory(use_parallel)
+add_subdirectory(use_task_engine)
 add_subdirectory(use_func)
 

@@ -1,297 +1,25 @@
 #pragma once
 
-#include <functional>
+#include "TaskGraph.hpp"
+#include "TaskExecutor.hpp"
+
+#include <memory>
 #include <thread>
-#include <mutex>
-#include <condition_variable>
-#include <map>
 #include <unordered_set>
 
-#include <boost/assert.hpp>
-#include <boost/any.hpp>
-#include <boost/range/iterator_range.hpp>
 #include <boost/range/algorithm/copy.hpp>
+#include <boost/assert.hpp>
 
 namespace silver_bullets {
+namespace task_engine {
 
-using const_pany_range = boost::iterator_range<boost::any const* const*>;
-using pany_range = boost::iterator_range<boost::any**>;
-
-using TaskFunc = std::function<void(const pany_range&, const const_pany_range&)>;
-
-
-
-using TaskFuncRegistry = std::map<int, TaskFunc>;
-
-struct Task
-{
-    std::size_t inputCount = 0;
-    std::size_t outputCount = 0;
-    int taskFuncId = 0;
-    int resourceType = 0;
-};
-
-
-
-struct InputEndPoint
-{
-    size_t taskId;
-    size_t inputPort;
-};
-
-struct less_input_pt {
-    bool operator()(const InputEndPoint& a, const InputEndPoint& b) const {
-        return a.taskId == b.taskId? a.inputPort < b.inputPort: a.taskId < b.taskId;
-    }
-};
-
-struct OutputEndPoint
-{
-    size_t taskId;
-    size_t outputPort;
-};
-
-struct less_output_pt {
-    bool operator()(const OutputEndPoint& a, const OutputEndPoint& b) const {
-        return a.taskId == b.taskId? a.outputPort < b.outputPort: a.taskId < b.taskId;
-    }
-};
-
-
-
-struct Connection
-{
-    OutputEndPoint from;
-    InputEndPoint to;
-};
-
-class TaskExecutor
-{
-public:
-    using Cb = std::function<void()>;
-
-    virtual ~TaskExecutor() = default;
-    virtual int resourceType() const = 0;
-    virtual void start(
-            const Task& task,
-            const pany_range& outputs,
-            const const_pany_range& inputs,
-            const Cb& cb,
-            const TaskFuncRegistry& taskFuncRegistry) = 0;
-    virtual bool propagateCb() = 0;
-};
-
-class ThreadedTaskExecutor : public TaskExecutor
-{
-public:
-    explicit ThreadedTaskExecutor(int resourceType) :
-        m_resourceType(resourceType),
-        m_thread([this]() { run(); })
-    {}
-
-    ~ThreadedTaskExecutor()
-    {
-        std::unique_lock<std::mutex> lk(m_mutex);
-        m_flags |= ExitRequested;
-        lk.unlock();
-        m_cond.notify_one();
-        m_thread.join();
-    }
-
-    int resourceType() const override {
-        return m_resourceType;
-    }
-
-    void start(
-            const Task& task,
-            const pany_range& outputs,
-            const const_pany_range& inputs,
-            const Cb& cb,
-            const TaskFuncRegistry& taskFuncRegistry) override
-    {
-        BOOST_ASSERT(!m_f);
-        BOOST_ASSERT(!m_cb);
-        m_f = taskFuncRegistry.at(task.taskFuncId);
-        m_outputs = outputs;
-        m_inputs = inputs;
-        m_cb = cb;
-        std::unique_lock<std::mutex> lk(m_mutex);
-        m_flags = HasInput;
-        lk.unlock();
-        m_cond.notify_one();
-    }
-
-    bool propagateCb() override
-    {
-        std::unique_lock<std::mutex> lk(m_mutex);
-        if (m_flags & HasOutput) {
-            m_flags = 0;
-            m_cb();
-            m_f = TaskFunc();
-            m_cb = Cb();
-            return true;
-        }
-        else
-            return false;
-    }
-
-private:
-    int m_resourceType;
-    TaskFunc m_f;
-    pany_range m_outputs;
-    const_pany_range m_inputs;
-    Cb m_cb;
-    std::mutex m_mutex;
-    std::condition_variable m_cond;
-    std::thread m_thread;
-    enum {
-        HasInput = 0x01,
-        HasOutput = 0x2,
-        ExitRequested = 0x4
-    };
-    unsigned int m_flags = 0;
-
-    void run() {
-        while (true) {
-            std::unique_lock<std::mutex> lk(m_mutex);
-            m_cond.wait(lk, [this] {
-                return !!(m_flags & (HasInput | ExitRequested));
-            });
-            if (m_flags & ExitRequested)
-                return;
-            m_f(m_outputs, m_inputs);
-            m_flags = HasOutput;
-        }
-    }
-};
-
-struct TaskGraph
-{
-    struct TaskInfo {
-        Task task;
-
-        // inputs of the task are determined by indices in dataMap range
-        // [inputIndex, inputIndex+task.inputCount)
-        std::size_t inputIndex;
-
-        // outputs of the task are determined by indices in dataMap range
-        // [outputIndex, outputIndex+task.outputCount)
-        std::size_t outputIndex;
-    };
-    std::vector<TaskInfo> taskInfo;
-    std::vector<Connection> connections;
-    std::map<int, std::size_t> resourceCapacity;
-    std::vector<boost::any> data;   // All data elements, including inputs and outputs
-    std::vector<size_t> dataMap;    // Each element is an index in data
-
-    boost::any& input(std::size_t taskId, std::size_t inputPort)
-    {
-        BOOST_ASSERT(taskId < taskInfo.size());
-        auto& ti = taskInfo[taskId];
-        BOOST_ASSERT(inputPort < ti.task.inputCount);
-        auto dataIndex = dataMap[ti.inputIndex+inputPort];
-        BOOST_ASSERT(dataIndex < data.size());
-        return data[dataIndex];
-    }
-
-    const boost::any& output(std::size_t taskId, std::size_t outputPort) const
-    {
-        BOOST_ASSERT(taskId < taskInfo.size());
-        auto& ti = taskInfo[taskId];
-        BOOST_ASSERT(outputPort < ti.task.outputCount);
-        auto dataIndex = dataMap[ti.outputIndex+outputPort];
-        BOOST_ASSERT(dataIndex < data.size());
-        return data[dataIndex];
-    }
-};
-
-class TaskGraphBuilder
-{
-public:
-    size_t addTask(
-            std::size_t inputCount,
-            std::size_t outputCount,
-            int taskFuncId,
-            int resourceType)
-    {
-        auto result = m_tasks.size();
-        m_tasks.emplace_back(Task{inputCount, outputCount, taskFuncId, resourceType});
-        return result;
-    }
-
-    void connect(
-            std::size_t sourceTaskId,
-            std::size_t sourcePort,
-            std::size_t sinkTaskId,
-            std::size_t sinkPort)
-    {
-        m_connections.emplace_back(
-            Connection{{sourceTaskId, sourcePort}, {sinkTaskId, sinkPort}});
-    }
-
-    TaskGraph taskGraph() const
-    {
-        TaskGraph result;
-        size_t dataMapSize = 0;
-        for (auto& t : m_tasks)
-            dataMapSize += t.inputCount + t.outputCount;
-        BOOST_ASSERT(m_connections.size() < dataMapSize);
-        auto dataSize = dataMapSize - m_connections.size();
-        result.taskInfo.reserve(m_tasks.size());
-        result.data.resize(dataSize);
-        result.dataMap.resize(dataMapSize);
-        result.connections = m_connections;
-
-        std::map<InputEndPoint, OutputEndPoint, less_input_pt> i2o;
-        for (auto c : m_connections) {
-            if (c.from.taskId >= m_tasks.size() ||
-                    c.from.outputPort >= m_tasks[c.from.taskId].outputCount ||
-                    c.to.taskId >= m_tasks.size() ||
-                    c.to.inputPort >= m_tasks[c.to.taskId].inputCount)
-                throw std::invalid_argument("TaskGraphBuilder: invalid connection");
-            if (i2o.find(c.to) != i2o.end())
-                throw std::invalid_argument("TaskGraphBuilder: multiple connetions to the same input port");
-            i2o.insert({c.to, c.from});
-        }
-
-        size_t idata = 0;
-        size_t imap = 0;
-        for (size_t taskId=0, n=m_tasks.size(); taskId<n; ++taskId) {
-            auto& task = m_tasks[taskId];
-            auto outputIndex = imap;
-            for (std::size_t outputPort=0; outputPort<task.outputCount; ++outputPort)
-                result.dataMap[imap++] = idata++;
-            result.taskInfo.emplace_back(TaskGraph::TaskInfo{task, 0, outputIndex});
-        }
-        for (size_t taskId=0, n=m_tasks.size(); taskId<n; ++taskId) {
-            auto& task = m_tasks[taskId];
-            result.taskInfo[taskId].inputIndex = imap;
-            for (std::size_t inputPort=0; inputPort<task.inputCount; ++inputPort) {
-                InputEndPoint input = { taskId, inputPort };
-                auto it = i2o.find(input);
-                if (it == i2o.end())
-                    result.dataMap[imap++] = idata++;
-                else {
-                    auto output = it->second;
-                    auto& adjTaskInfo = result.taskInfo[output.taskId];
-                    result.dataMap[imap++] = result.dataMap[adjTaskInfo.outputIndex + output.outputPort];
-                }
-            }
-        }
-        return result;
-    }
-
-private:
-    std::vector<Task> m_tasks;
-    std::vector<Connection> m_connections;
-};
-
+template <class TaskFunc>
 class TaskGraphExecutor
 {
 public:
     using Cb = std::function<void()>;
 
-    TaskGraphExecutor& addTaskExecutor(const std::shared_ptr<TaskExecutor>& taskExecutor)
+    TaskGraphExecutor& addTaskExecutor(const std::shared_ptr<TaskExecutor<TaskFunc>>& taskExecutor)
     {
         m_resourceInfo[taskExecutor->resourceType()].executorInfo.push_back({taskExecutor});
         return *this;
@@ -304,7 +32,7 @@ public:
     TaskGraphExecutor& start(
             TaskGraph *taskGraph,
             boost::any& cache,
-            const TaskFuncRegistry *taskFuncRegistry,
+            const TaskFuncRegistry<TaskFunc> *taskFuncRegistry,
             const Cb& cb)
     {
         BOOST_ASSERT(!m_cb);
@@ -316,7 +44,7 @@ public:
     TaskGraphExecutor& start(
             TaskGraph *taskGraph,
             boost::any& cache,
-            const TaskFuncRegistry *taskFuncRegistry)
+            const TaskFuncRegistry<TaskFunc> *taskFuncRegistry)
     {
         BOOST_ASSERT(!m_cb);
         startPriv(taskGraph, cache, taskFuncRegistry);
@@ -392,7 +120,7 @@ public:
 
 private:
     struct ExecutorInfo {
-        std::shared_ptr<TaskExecutor> executor;
+        std::shared_ptr<TaskExecutor<TaskFunc>> executor;
         std::size_t taskId = ~0;
     };
     struct ResourceInfo
@@ -406,7 +134,7 @@ private:
     struct Cache
     {
         std::vector<std::size_t> roots; // taskIds of tasks with all inputs initially available
-        std::multimap<OutputEndPoint, InputEndPoint, less_output_pt> o2i;
+        std::multimap<OutputEndPoint, InputEndPoint> o2i;
         std::size_t totalOutputCount = 0;
         // index=taskId, value=number of inputs initially available
         std::vector<std::size_t> initAvailTaskInputs;
@@ -430,7 +158,7 @@ private:
     TaskGraph *m_taskGraph = nullptr;
     std::size_t m_totalComputedOutputCount = 0;
     const Cache *m_cache = nullptr;
-    const TaskFuncRegistry *m_taskFuncRegistry = nullptr;
+    const TaskFuncRegistry<TaskFunc> *m_taskFuncRegistry = nullptr;
 
     // Elements are taskIds of tasks with all inputs available, whose processing has not started yet.
     std::unordered_set<std::size_t> m_ready;
@@ -438,7 +166,7 @@ private:
     void startPriv(
             TaskGraph *taskGraph,
             boost::any& cache,
-            const TaskFuncRegistry *taskFuncRegistry)
+            const TaskFuncRegistry<TaskFunc> *taskFuncRegistry)
     {
         BOOST_ASSERT(!m_running);
         BOOST_ASSERT(!m_taskGraph);
@@ -457,7 +185,7 @@ private:
 
             // Compute i2o and o2i maps
             BOOST_ASSERT(mcache->o2i.empty());
-            std::map<InputEndPoint, OutputEndPoint, less_input_pt> i2o;
+            std::map<InputEndPoint, OutputEndPoint> i2o;
             for (auto& c : m_taskGraph->connections) {
                 i2o[c.to] = c.from;
                 mcache->o2i.insert({c.from, c.to});
@@ -545,4 +273,5 @@ private:
     }
 };
 
+} // namespace task_engine
 } // namespace silver_bullets
