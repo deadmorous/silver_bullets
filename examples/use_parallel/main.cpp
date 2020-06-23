@@ -1,25 +1,27 @@
-#include "parallel/task_engine.hpp"
+#include "parallel/task_engine_func.hpp"
 
 #include <iostream>
 
 using namespace std;
 using namespace silver_bullets;
 
-template<class F> inline TaskFunc taskFunc_2(F f)
-{
-    return [f](pany_range out, const_pany_range in) {
-        BOOST_ASSERT(out.size() == 1);
-        BOOST_ASSERT(in.size() == 2);
-        using args_t = typename boost::function_types::parameter_types<decltype(&F::operator())>::type;
-        using A1 = typename boost::mpl::at<args_t, boost::mpl::int_<1>>::type;
-        using A2 = typename boost::mpl::at<args_t, boost::mpl::int_<2>>::type;
-        *(out[0]) = f(boost::any_cast<A1>(*(in[0])), boost::any_cast<A2>(*(in[1])));
-    };
-}
-
+// Computes the following graph (each node computes the sum of its two input).
+//
+//       1 2
+//       | |
+//       +-+
+//       |1|
+//  4    +-+
+//   \   /
+//    \ /
+//    +-+
+//    |4|
+//    +-+
+//     |
+//     7
 void test_01()
 {
-    auto plus = taskFunc_2([](int a, int b) {
+    auto plus = makeTaskFunc([](int a, int b) {
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         return a + b;
     });
@@ -45,15 +47,38 @@ void test_01()
         x.addTaskExecutor(std::make_shared<ThreadedTaskExecutor>(resType));
 
     auto cache = x.makeCache();
-    x.start(&g, cache, &taskFuncRegistry);
-    x.join();
+    x.start(&g, cache, &taskFuncRegistry).join();
 
     cout << boost::any_cast<int>(g.output(task2, 0)) << endl;
 }
 
+// Computes the following graph (each node computes the sum of its two input).
+//
+// 1 2   3 4   5 6   7 8
+// | |   | |   | |   | |
+// +-+   +-+   +-+   +-+
+// |0|   |1|   |2|   |3|
+// +-+   +-+   +-+   +-+
+//   \   / \   / \   /
+//    \ /   \ /   \ /
+//    +-+   +-+   +-+
+//    |4|   |5|   |6|
+//    +-+   +-+   +-+
+//      \   / \   /
+//       \ /   \ /
+//       +-+   +-+
+//       |7|   |8|
+//       +-+   +-+
+//         \   /
+//          \ /
+//          +-+
+//          |9|
+//          +-+
+//           |
+//           72
 void test_02()
 {
-    auto plus = taskFunc_2([](int a, int b) {
+    auto plus = makeTaskFunc([](int a, int b) {
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         return a + b;
     });
@@ -93,62 +118,34 @@ void test_02()
     }
 
     auto cache = x.makeCache();
-    x.start(&g, cache, &taskFuncRegistry);
-    x.join();
+
+    bool syncMode = true;
+    if (syncMode) {
+        // Call computation synchronously
+        x.start(&g, cache, &taskFuncRegistry);
+        x.join();
+    }
+    else {
+        // In the asynchronous mode, we specify a callback;
+        // however, to get that callback called from the main thread,
+        // we need to call propagateCb() sometimes.
+        auto done = false;
+        x.start(&g, cache, &taskFuncRegistry, [&done]() {
+            done = true;
+        });
+        while (!done) {
+            std::this_thread::sleep_for(std::chrono::microseconds(1));
+            x.propagateCb();
+        }
+    }
 
     cout << boost::any_cast<int>(g.output(bottomTask, 0)) << endl;
 }
 
-/*
-void f()
-{
-    TaskGraph g;
-
-    auto plus = taskFunc_2([](int a, int b) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        return a + b;
-    });
-    TaskFuncRegistry taskFuncRegistry;
-    constexpr auto addId = 123;
-    constexpr auto resType = 444;
-    taskFuncRegistry[addId] = plus;
-    Task add = {2, 1, addId, resType};
-    ThreadedTaskExecutor x(resType);
-
-    vector<boost::any> inputs(2);
-    inputs[0] = 1;
-    inputs[1] = 2;
-    vector<boost::any> outputs(1);
-    auto done = false;
-    auto cb = [&]() {
-        cout << "WOW! " << boost::any_cast<int>(outputs[0]) << endl;
-        done = true;
-    };
-    x.start(add, vectorRange(outputs), vectorRange(inputs), cb, taskFuncRegistry);
-
-    // g.setResourceCapacity(123, 10);
-//    auto idAdd = g.addTask(&add, 1);
-
-//    g.setCb([&]() {
-//        cout << "WOW! " << boost::any_cast<int>(add.getOutputs()[0]) << endl;
-//        done = true;
-//    });
-
-//    g.start({{idAdd, 0}});
-
-//    add.start();
-
-    while(!done) {
-        std::this_thread::sleep_for(std::chrono::microseconds(1));
-        x.propagateCb();
-    }
-}
-//*/
 int main()
 {
-    // test_01();
+    test_01();
     test_02();
-    // f();
 
     return 0;
 }

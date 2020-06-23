@@ -11,9 +11,6 @@
 #include <boost/any.hpp>
 #include <boost/range/iterator_range.hpp>
 #include <boost/range/algorithm/copy.hpp>
-#include <boost/function_types/parameter_types.hpp>
-#include <boost/mpl/at.hpp>
-#include <boost/mpl/int.hpp>
 
 namespace silver_bullets {
 
@@ -208,18 +205,6 @@ struct TaskGraph
     }
 };
 
-//template<class F> inline TaskFunc taskFunc_2(F f)
-//{
-//    return [f](pany_range out, const_pany_range in) {
-//        BOOST_ASSERT(out.size() == 1);
-//        BOOST_ASSERT(in.size() == 2);
-//        using args_t = typename boost::function_types::parameter_types<decltype(&F::operator())>::type;
-//        using A1 = typename boost::mpl::at<args_t, boost::mpl::int_<1>>::type;
-//        using A2 = typename boost::mpl::at<args_t, boost::mpl::int_<2>>::type;
-//        *(out[0]) = f(boost::any_cast<A1>(*(in[0])), boost::any_cast<A2>(*(in[1])));
-//    };
-//}
-
 class TaskGraphBuilder
 {
 public:
@@ -306,15 +291,17 @@ class TaskGraphExecutor
 public:
     using Cb = std::function<void()>;
 
-    void addTaskExecutor(const std::shared_ptr<TaskExecutor>& taskExecutor) {
+    TaskGraphExecutor& addTaskExecutor(const std::shared_ptr<TaskExecutor>& taskExecutor)
+    {
         m_resourceInfo[taskExecutor->resourceType()].executorInfo.push_back({taskExecutor});
+        return *this;
     }
 
     boost::any makeCache() {
         return Cache();
     }
 
-    void start(
+    TaskGraphExecutor& start(
             TaskGraph *taskGraph,
             boost::any& cache,
             const TaskFuncRegistry *taskFuncRegistry,
@@ -323,23 +310,26 @@ public:
         BOOST_ASSERT(!m_cb);
         m_cb = cb;
         startPriv(taskGraph, cache, taskFuncRegistry);
+        return *this;
     }
 
-    void start(
+    TaskGraphExecutor& start(
             TaskGraph *taskGraph,
             boost::any& cache,
             const TaskFuncRegistry *taskFuncRegistry)
     {
         BOOST_ASSERT(!m_cb);
         startPriv(taskGraph, cache, taskFuncRegistry);
+        return *this;
     }
 
-    void join()
+    TaskGraphExecutor& join()
     {
         while(m_running) {
             std::this_thread::sleep_for(std::chrono::microseconds(1));
             propagateCb();
         }
+        return *this;
     }
 
     bool propagateCb()
