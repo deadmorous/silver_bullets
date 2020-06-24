@@ -7,6 +7,9 @@
 #include <functional>
 
 namespace silver_bullets {
+
+class ThreadNotifier;
+
 namespace task_engine {
 
 template<class TaskFunc>
@@ -18,6 +21,8 @@ public:
     virtual ~TaskExecutor() = default;
     virtual int resourceType() const = 0;
     virtual bool propagateCb() = 0;
+    virtual void setTaskCompletionNotifier(ThreadNotifier *taskCompletionNotifier) = 0;
+    virtual ThreadNotifier *taskCompletionNotifier() const = 0;
 
     template<class ... Args>
     void start(

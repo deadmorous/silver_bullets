@@ -21,6 +21,8 @@ using namespace silver_bullets::task_engine;
 //     7
 void test_01()
 {
+    cout << endl << "=== test_01() ===" << endl;
+
     using TaskFunc = SimpleTaskFunc;
     using TFR = TaskFuncRegistry<TaskFunc>;
     using TTX = ThreadedTaskExecutor<TaskFunc>;
@@ -83,6 +85,8 @@ void test_01()
 //           72
 void test_02()
 {
+    cout << endl << "=== test_02() ===" << endl;
+
     using TaskFunc = SimpleTaskFunc;
     using TFR = TaskFuncRegistry<TaskFunc>;
     using TTX = ThreadedTaskExecutor<TaskFunc>;
@@ -182,6 +186,8 @@ void test_02()
 //            57
 void test_03()
 {
+    cout << endl << "=== test_03() ===" << endl;
+
     using TaskFunc = StatefulTaskFunc;
 
     // Outputs the sum of the local state and all inputs
@@ -192,6 +198,7 @@ void test_03()
             auto result =
                     boost::any_cast<int>(*threadLocalData()) +
                     boost::any_cast<int>(*readOnlySharedData());
+
             for (auto& item : in)
                 result += boost::any_cast<int>(*item);
             *(out[0]) = result;
@@ -246,8 +253,27 @@ void test_03()
 }
 
 
+// Example of use of a stateful cancellable task functions
+//
+// Computes the graph similar to that of in test_03, but smaller:
+//
+//         +-----+
+//         | t11 |
+//         +-----+
+//          |   |
+//     +-----+ +-----+
+//     | t21 | | t22 |
+//     +-----+ +-----+
+//          |   |
+//         +-----+
+//         | t31 |
+//         +-----+
+//            |
+//            15
 void test_04()
 {
+    cout << endl << "=== test_04() ===" << endl;
+
     using TaskFunc = StatefulCancellableTaskFunc;
 
     // Outputs the sum of the local state and all inputs
@@ -258,8 +284,9 @@ void test_04()
                     const const_pany_range& in,
                     const std::atomic<bool>& cancel) const override
         {
-            for (auto x=0; x<300; ++x) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            // Wait for 300 ms, but check if the computation is cancelled each 10 ms.
+            for (auto x=0; x<30; ++x) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 if (cancel)
                     return;
             }
@@ -313,29 +340,22 @@ void test_04()
         cout << "Time elapsed: " << duration_cast<milliseconds>(duration).count() << " ms" << endl;
     };
 
-//    for (auto i=0; i<100; ++i) {
-//        this_thread::sleep_for(chrono::milliseconds(10));
-//        x.propagateCb();
-//    }
-//    reportTimeElapsed();
-//    if (x.isRunning()) {
-//        cancel(x);
-//        //requestCancel(x);
-//        cout << "Cancelled" << endl;
-//    }
-//    else
-//        cout << boost::any_cast<int>(g.output(t31, 0)) << endl;
-    x.join();
-    cout << boost::any_cast<int>(g.output(t31, 0)) << endl;
+    if (x.maybeJoin(std::chrono::milliseconds(1000)))
+        cout << boost::any_cast<int>(g.output(t31, 0)) << endl;
+    else {
+        cout << "Cancelling... ";
+        cancel(x);
+        cout << "cancelled" << endl;
+    }
 
     reportTimeElapsed();
 }
 
 int main()
 {
-//    test_01();
-//    test_02();
-//    test_03();
+    test_01();
+    test_02();
+    test_03();
     test_04();
 
     return 0;

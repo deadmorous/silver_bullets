@@ -3,6 +3,8 @@
 #include "TaskGraph.hpp"
 #include "TaskExecutor.hpp"
 
+#include "sync/ThreadNotifier.hpp"
+
 #include <memory>
 #include <thread>
 #include <unordered_set>
@@ -131,6 +133,7 @@ public:
     TaskGraphExecutor& addTaskExecutor(const std::shared_ptr<TaskExecutor<TaskFunc>>& taskExecutor)
     {
         m_resourceInfo[taskExecutor->resourceType()].executorInfo.push_back({taskExecutor});
+        taskExecutor->setTaskCompletionNotifier(&m_taskCompletionNotifier);
         return *this;
     }
 
@@ -156,11 +159,29 @@ public:
     TaskGraphExecutor& join()
     {
         while(m_running) {
-            std::this_thread::sleep_for(std::chrono::microseconds(1));
+            m_taskCompletionNotifier.wait();
             propagateCb();
         }
         m_cancelParam = TaskExecutorCancelParam<TaskFunc>::initializer();
         return *this;
+    }
+
+    template< class Rep, class Period >
+    bool maybeJoin(const std::chrono::duration<Rep, Period>& rel_time)
+    {
+        auto end_time = std::chrono::system_clock::now() + rel_time;
+        auto timeout = rel_time;
+        while(m_running) {
+            if (!m_taskCompletionNotifier.wait_for(timeout))
+                return false;
+            auto now = std::chrono::system_clock::now();
+            if (now >= end_time)
+                return false;
+            timeout = std::chrono::duration_cast<decltype (timeout)>(end_time - now);
+            propagateCb();
+        }
+        m_cancelParam = TaskExecutorCancelParam<TaskFunc>::initializer();
+        return true;
     }
 
     bool propagateCb()
@@ -243,6 +264,7 @@ private:
     TaskExecutorCancelParam_t<TaskFunc> m_cancelParam =
             TaskExecutorCancelParam<TaskFunc>::initializer();
 
+    ThreadNotifier m_taskCompletionNotifier;
     std::map<int, ResourceInfo> m_resourceInfo;
 
     struct Cache
