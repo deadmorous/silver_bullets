@@ -1,7 +1,9 @@
 #pragma once
 
-#include "types.hpp"
-#include <functional>
+#include "StatefulTaskFuncTraits.hpp"
+#include "TaskFuncRegistry.hpp"
+#include "Task.hpp"
+
 #include <memory>
 
 namespace silver_bullets {
@@ -53,36 +55,47 @@ private:
     std::shared_ptr<StatefulTaskFuncInterface> m_statefulTaskFunc;
 };
 
-template<>
-struct TaskFuncTraits<StatefulTaskFunc>
-{
-    using ThreadLocalData = boost::any;
-    using ReadOnlySharedData = boost::any;
+template<> struct TaskFuncTraits<StatefulTaskFunc> :
+        StatefulTaskFuncTraits<StatefulTaskFunc>
+{};
 
-    static void setTaskFuncResources(
-            ThreadLocalData* threadLocalData,
-            const ReadOnlySharedData* readOnlySharedData,
-            StatefulTaskFunc& taskFunc)
-    {
-        auto func = taskFunc.func();
-        func->setThreadLocalData(threadLocalData);
-        func->setReadOnlySharedData(readOnlySharedData);
-    }
-};
-
-template<> class ThreadedTaskExecutorInit<StatefulTaskFunc>
+template<> class ThreadedTaskExecutorInit<StatefulTaskFunc> :
+        public StatefulThreadedTaskExecutorInit<StatefulTaskFunc>
 {
 public:
     template<class F>
     explicit ThreadedTaskExecutorInit(const F& init) :
-        m_init(init)
+        StatefulThreadedTaskExecutorInit<StatefulTaskFunc>(init)
     {}
-    TaskFuncTraits<StatefulTaskFunc>::ThreadLocalData operator()() const {
-        return m_init();
-    }
-private:
-    std::function<boost::any()> m_init;
 };
+
+template<> struct TaskExecutorStartParam<StatefulTaskFunc>
+{
+    Task task;
+    pany_range outputs;
+    const_pany_range inputs;
+    // const TaskFuncRegistry<StatefulTaskFunc>* taskFuncRegistry = nullptr;
+    std::reference_wrapper<const TaskFuncRegistry<StatefulTaskFunc>> taskFuncRegistry;
+    std::function<void()> cb;
+
+    void callTaskFunc(StatefulTaskFunc& taskFunc) const {
+        taskFunc(outputs, inputs);
+    }
+
+    static TaskExecutorStartParam<StatefulTaskFunc> makeInvalidInstance()
+    {
+        static constexpr const TaskFuncRegistry<StatefulTaskFunc>* ptfr = nullptr;
+        return {
+            Task(),
+            pany_range(),
+            const_pany_range(),
+            *ptfr,
+            std::function<void()>()
+        };
+    }
+};
+
+template<> struct IsCancellable<StatefulTaskFunc> : std::false_type {};
 
 } // namespace task_engine
 } // namespace silver_bullets

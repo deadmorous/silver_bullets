@@ -1,10 +1,13 @@
 #pragma once
 
 #include "types.hpp"
+#include "TaskFuncRegistry.hpp"
+#include "Task.hpp"
 
 #include "func/func_arg_convert.hpp"
 
 #include <functional>
+#include <optional>
 
 namespace silver_bullets {
 namespace task_engine {
@@ -63,6 +66,33 @@ public:
         return {};
     }
 };
+
+template<> struct TaskExecutorStartParam<SimpleTaskFunc>
+{
+    Task task;
+    pany_range outputs;
+    const_pany_range inputs;
+    std::reference_wrapper<const TaskFuncRegistry<SimpleTaskFunc>> taskFuncRegistry;
+    std::function<void()> cb;
+
+    void callTaskFunc(SimpleTaskFunc& taskFunc) const {
+        taskFunc(outputs, inputs);
+    }
+
+    static TaskExecutorStartParam<SimpleTaskFunc> makeInvalidInstance()
+    {
+        static constexpr const TaskFuncRegistry<SimpleTaskFunc>* ptfr = nullptr;
+        return {
+            Task(),
+            pany_range(),
+            const_pany_range(),
+            *ptfr,
+            std::function<void()>()
+        };
+    }
+};
+
+template<> struct IsCancellable<SimpleTaskFunc> : std::false_type {};
 
 } // namespace task_engine
 } // namespace silver_bullets

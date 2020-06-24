@@ -245,11 +245,98 @@ void test_03()
     cout << boost::any_cast<int>(g.output(t51, 0)) << endl;
 }
 
+
+void test_04()
+{
+    using TaskFunc = StatefulCancellableTaskFunc;
+
+    // Outputs the sum of the local state and all inputs
+    class ComputeFunc : public StatefulCancellableTaskFuncInterface {
+    public:
+        void call(
+                    const pany_range& out,
+                    const const_pany_range& in,
+                    const std::atomic<bool>& cancel) const override
+        {
+            for (auto x=0; x<300; ++x) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                if (cancel)
+                    return;
+            }
+            auto result =
+                    boost::any_cast<int>(*threadLocalData()) +
+                    boost::any_cast<int>(*readOnlySharedData());
+            for (auto& item : in)
+                result += boost::any_cast<int>(*item);
+            *(out[0]) = result;
+        }
+    };
+    auto computeFuncId = 1;
+
+    using TFR = TaskFuncRegistry<TaskFunc>;
+    using TTX = ThreadedTaskExecutor<TaskFunc>;
+    using TGX = TaskGraphExecutor<TaskFunc>;
+
+    TFR taskFuncRegistry;
+    taskFuncRegistry[computeFuncId] = TaskFunc(make_shared<ComputeFunc>());
+
+    TGX x;
+    auto resType = 1;
+    boost::any readOnlySharedData = 2;
+    for (auto i=0; i<5; ++i) {
+        auto tx = std::make_shared<TTX>(resType, [](){ return boost::any(1); });
+        tx->setReadOnlySharedData(&readOnlySharedData);
+        x.addTaskExecutor(tx);
+    }
+
+    TaskGraphBuilder b;
+    auto t11 = b.addTask(0, 1, computeFuncId, resType);
+    auto t21 = b.addTask(1, 1, computeFuncId, resType);
+    auto t22 = b.addTask(1, 1, computeFuncId, resType);
+    auto t31 = b.addTask(2, 1, computeFuncId, resType);
+    b.connect(t11, 0, t21, 0);
+    b.connect(t11, 0, t22, 0);
+    b.connect(t21, 0, t31, 0);
+    b.connect(t22, 0, t31, 1);
+
+    auto g = b.taskGraph();
+    auto cache = x.makeCache();
+    x.start(&g, cache, &taskFuncRegistry);
+    cout << "Started..." << endl;
+
+    using namespace std::chrono;
+    auto startTime = system_clock::now();
+
+    auto reportTimeElapsed = [&startTime]() {
+        auto endTime = system_clock::now();
+        auto duration = endTime - startTime;
+        cout << "Time elapsed: " << duration_cast<milliseconds>(duration).count() << " ms" << endl;
+    };
+
+//    for (auto i=0; i<100; ++i) {
+//        this_thread::sleep_for(chrono::milliseconds(10));
+//        x.propagateCb();
+//    }
+//    reportTimeElapsed();
+//    if (x.isRunning()) {
+//        cancel(x);
+//        //requestCancel(x);
+//        cout << "Cancelled" << endl;
+//    }
+//    else
+//        cout << boost::any_cast<int>(g.output(t31, 0)) << endl;
+    x.join();
+    cout << boost::any_cast<int>(g.output(t31, 0)) << endl;
+
+    reportTimeElapsed();
+}
+
 int main()
 {
-    test_01();
-    test_02();
-    test_03();
+//    test_01();
+//    test_02();
+//    test_03();
+    test_04();
 
     return 0;
 }

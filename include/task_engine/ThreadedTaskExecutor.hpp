@@ -40,19 +40,11 @@ public:
         return m_resourceType;
     }
 
-    void start(
-            const Task& task,
-            const pany_range& outputs,
-            const const_pany_range& inputs,
-            const Cb& cb,
-            const TaskFuncRegistry<TaskFunc>& taskFuncRegistry) override
+    void doStart(TaskExecutorStartParam<TaskFunc>&& startParam) override
     {
         BOOST_ASSERT(!m_f);
-        BOOST_ASSERT(!m_cb);
-        m_f = taskFuncRegistry.at(task.taskFuncId);
-        m_outputs = outputs;
-        m_inputs = inputs;
-        m_cb = cb;
+        m_startParam = std::move(startParam);
+        m_f = m_startParam.taskFuncRegistry.get().at(m_startParam.task.taskFuncId);
         std::unique_lock<std::mutex> lk(m_mutex);
         m_flags = HasInput;
         lk.unlock();
@@ -64,9 +56,10 @@ public:
         std::unique_lock<std::mutex> lk(m_mutex);
         if (m_flags & HasOutput) {
             m_flags = 0;
-            m_cb();
+            if (m_startParam.cb)
+                m_startParam.cb();
             m_f = TaskFunc();
-            m_cb = Cb();
+            m_startParam = TaskExecutorStartParam<TaskFunc>::makeInvalidInstance();
             return true;
         }
         else
@@ -84,9 +77,8 @@ public:
 private:
     int m_resourceType;
     TaskFunc m_f;
-    pany_range m_outputs;
-    const_pany_range m_inputs;
-    Cb m_cb;
+    TaskExecutorStartParam<TaskFunc> m_startParam =
+            TaskExecutorStartParam<TaskFunc>::makeInvalidInstance();
     std::mutex m_mutex;
     std::condition_variable m_cond;
     enum {
@@ -109,13 +101,14 @@ private:
             m_cond.wait(lk, [this] {
                 return !!(m_flags & (HasInput | ExitRequested));
             });
+            lk.unlock();
             if (m_flags & ExitRequested)
                 return;
             TaskFuncTraits<TaskFunc>::setTaskFuncResources(
                         &m_threadLocalData,
                         m_readOnlySharedData,
                         m_f);
-            m_f(m_outputs, m_inputs);
+            m_startParam.callTaskFunc(m_f);
             m_flags = HasOutput;
         }
     }

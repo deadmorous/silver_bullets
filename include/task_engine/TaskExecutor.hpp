@@ -17,13 +17,24 @@ public:
 
     virtual ~TaskExecutor() = default;
     virtual int resourceType() const = 0;
-    virtual void start(
+    virtual bool propagateCb() = 0;
+
+    template<class ... Args>
+    void start(
             const Task& task,
             const pany_range& outputs,
             const const_pany_range& inputs,
-            const Cb& cb,
-            const TaskFuncRegistry<TaskFunc>& taskFuncRegistry) = 0;
-    virtual bool propagateCb() = 0;
+            const TaskFuncRegistry<TaskFunc>& taskFuncRegistry,
+            Args&& ... args) {
+        doStart({ task, outputs, inputs, taskFuncRegistry, std::forward<Args>(args)... });
+    }
+
+    void start(TaskExecutorStartParam<TaskFunc>&& startParam) {
+        doStart(std::move(startParam));
+    }
+
+protected:
+    virtual void doStart(TaskExecutorStartParam<TaskFunc>&& startParam) = 0;
 };
 
 } // namespace task_engine

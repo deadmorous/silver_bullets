@@ -6,12 +6,121 @@
 #include <memory>
 #include <thread>
 #include <unordered_set>
+#include <atomic>
 
 #include <boost/range/algorithm/copy.hpp>
 #include <boost/assert.hpp>
 
 namespace silver_bullets {
 namespace task_engine {
+
+template<class TaskFunc>
+struct TaskExecutorCancelParam<TaskFunc, std::enable_if_t<IsCancellable_v<TaskFunc>, void>>
+{
+    using type = std::atomic<bool>;
+    static constexpr bool initializer() noexcept { return 0; }
+    static constexpr bool isCancelled(const type& c) {
+        return c;
+    }
+};
+
+template<class TaskFunc>
+struct TaskExecutorCancelParam<TaskFunc, std::enable_if_t<!IsCancellable_v<TaskFunc>, void>>
+{
+    struct type {};
+    static constexpr type initializer() noexcept { return {}; }
+    static constexpr bool isCancelled(const type&) {
+        return false;
+    }
+};
+
+template <class TaskFunc>
+struct TaskGraphExecutorStartParam
+{
+    TaskGraph *taskGraph;
+    std::reference_wrapper<boost::any> cache;
+    std::reference_wrapper<const TaskFuncRegistry<TaskFunc>> taskFuncRegistry;
+    std::function<void()> cb;
+
+    static TaskGraphExecutorStartParam<TaskFunc> makeInvalidInstance()
+    {
+        static constexpr const TaskFuncRegistry<TaskFunc>* ptfr = nullptr;
+        static constexpr boost::any *pcache = nullptr;
+        return {
+            nullptr,
+            *pcache,
+            *ptfr,
+            std::function<void()>()
+        };
+    }
+
+    template<bool cancellable, class ... Args>
+    TaskExecutorStartParam<TaskFunc> makeTaskExecutorStartParam(
+            const Task& task,
+            const pany_range& outputs,
+            const const_pany_range& inputs,
+            const TaskFuncRegistry<TaskFunc>& taskFuncRegistry,
+            TaskExecutorCancelParam_t<TaskFunc> cancelParam,
+            Args&& ... args) const
+    {
+        return { task, outputs, inputs, taskFuncRegistry, std::forward<Args>(args) ... };
+    }
+};
+
+template<class TaskFunc, bool cancellable> struct TaskExecutorStartParamMaker;
+
+template<class TaskFunc>
+struct TaskExecutorStartParamMaker<TaskFunc, false>
+{
+    template<class ... Args>
+    static TaskExecutorStartParam<TaskFunc> make(
+                const Task& task,
+                const pany_range& outputs,
+                const const_pany_range& inputs,
+                const TaskFuncRegistry<TaskFunc>& taskFuncRegistry,
+                TaskExecutorCancelParam_t<TaskFunc>& /*cancelParam*/,
+                Args&& ... args)
+        {
+            return { task, outputs, inputs, taskFuncRegistry, std::forward<Args>(args) ... };
+        }
+};
+
+template<class TaskFunc>
+struct TaskExecutorStartParamMaker<TaskFunc, true>
+{
+    template<class ... Args>
+    static TaskExecutorStartParam<TaskFunc> make(
+                const Task& task,
+                const pany_range& outputs,
+                const const_pany_range& inputs,
+                const TaskFuncRegistry<TaskFunc>& taskFuncRegistry,
+                TaskExecutorCancelParam_t<TaskFunc>& cancelParam,
+                Args&& ... args)
+        {
+            return { task, outputs, inputs, taskFuncRegistry, cancelParam, std::forward<Args>(args) ... };
+        }
+};
+
+template<class TaskFunc, class ... Args>
+inline TaskExecutorStartParam<TaskFunc> makeTaskExecutorStartParam(
+        const Task& task,
+        const pany_range& outputs,
+        const const_pany_range& inputs,
+        const TaskFuncRegistry<TaskFunc>& taskFuncRegistry,
+        TaskExecutorCancelParam_t<TaskFunc>& cancelParam,
+        Args&& ... args)
+{
+    return TaskExecutorStartParamMaker<TaskFunc, IsCancellable_v<TaskFunc>>::make(
+        task, outputs, inputs, taskFuncRegistry, cancelParam, args ...);
+}
+
+template <class TaskFunc> class TaskGraphExecutor;
+
+template <class TaskFunc>
+inline void cancel(TaskGraphExecutor<TaskFunc>& x);
+
+template <class TaskFunc>
+inline void requestCancel(TaskGraphExecutor<TaskFunc>& x);
 
 template <class TaskFunc>
 class TaskGraphExecutor
@@ -29,26 +138,19 @@ public:
         return Cache();
     }
 
+    template<class ... Args>
     TaskGraphExecutor& start(
             TaskGraph *taskGraph,
             boost::any& cache,
             const TaskFuncRegistry<TaskFunc> *taskFuncRegistry,
-            const Cb& cb)
+            Args&& ... args)
     {
-        BOOST_ASSERT(!m_cb);
-        m_cb = cb;
-        startPriv(taskGraph, cache, taskFuncRegistry);
+        startPriv(TaskGraphExecutorStartParam<TaskFunc>{ taskGraph, cache, *taskFuncRegistry, args... });
         return *this;
     }
 
-    TaskGraphExecutor& start(
-            TaskGraph *taskGraph,
-            boost::any& cache,
-            const TaskFuncRegistry<TaskFunc> *taskFuncRegistry)
-    {
-        BOOST_ASSERT(!m_cb);
-        startPriv(taskGraph, cache, taskFuncRegistry);
-        return *this;
+    bool isRunning() const {
+        return m_running;
     }
 
     TaskGraphExecutor& join()
@@ -57,13 +159,16 @@ public:
             std::this_thread::sleep_for(std::chrono::microseconds(1));
             propagateCb();
         }
+        m_cancelParam = TaskExecutorCancelParam<TaskFunc>::initializer();
         return *this;
     }
 
     bool propagateCb()
     {
+        auto cancelled = TaskExecutorCancelParam<TaskFunc>::isCancelled(m_cancelParam);
         if (m_running) {
             // Track finished tasks
+            std::size_t totalRunningExecutorCount = 0;
             BOOST_ASSERT(m_totalComputedOutputCount < m_cache->totalOutputCount);
             for (auto& resourceInfoItem : m_resourceInfo) {
                 auto& ri = resourceInfoItem.second;
@@ -73,7 +178,7 @@ public:
                         // Executor has finished task
 
                         // Update the total number of computed outputs
-                        auto& ti = m_taskGraph->taskInfo[xi.taskId];
+                        auto& ti = m_startParam.taskGraph->taskInfo[xi.taskId];
                         m_totalComputedOutputCount += ti.task.outputCount;
 
                         // Update available input counters for connected tasks;
@@ -83,7 +188,7 @@ public:
                             for (auto& o2iItem : boost::make_iterator_range(itr.first, itr.second)) {
                                 auto adjTaskId = o2iItem.second.taskId;
                                 auto availAdjInputCount = ++m_cache->availTaskInputs[adjTaskId];
-                                if (availAdjInputCount == m_taskGraph->taskInfo[adjTaskId].task.inputCount)
+                                if (availAdjInputCount == m_startParam.taskGraph->taskInfo[adjTaskId].task.inputCount)
                                     m_ready.insert(adjTaskId);
                             }
                         }
@@ -99,21 +204,27 @@ public:
                         }
                     }
                 }
+                totalRunningExecutorCount += ri.runningExecutorCount;
             }
 
-            // Start new tasks
-            startNextTasks();
+            if (cancelled) {
+                if (totalRunningExecutorCount == 0) {
+                    setNonRunningState();
+                    return true;
+                }
+                else
+                    return false;
+            }
+            else
+                startNextTasks();
         }
         else
             return false;
         if (m_totalComputedOutputCount == m_cache->totalOutputCount) {
-            m_running = false;
-            if (m_cb)
-                m_cb();
-            m_cb = Cb();
-            m_taskGraph = nullptr;
-            m_cache = nullptr;
-            m_taskFuncRegistry = nullptr;
+            auto cb = std::move(m_startParam.cb);
+            setNonRunningState();
+            if (cb)
+                cb();
         }
         return !m_running;
     }
@@ -128,6 +239,9 @@ private:
         std::vector<ExecutorInfo> executorInfo;
         std::size_t runningExecutorCount = 0;   // Running are all at the beginning of executors
     };
+
+    TaskExecutorCancelParam_t<TaskFunc> m_cancelParam =
+            TaskExecutorCancelParam<TaskFunc>::initializer();
 
     std::map<int, ResourceInfo> m_resourceInfo;
 
@@ -154,39 +268,33 @@ private:
     };
 
     bool m_running = false;
-    Cb m_cb;
-    TaskGraph *m_taskGraph = nullptr;
+    TaskGraphExecutorStartParam<TaskFunc> m_startParam =
+            TaskGraphExecutorStartParam<TaskFunc>::makeInvalidInstance();
     std::size_t m_totalComputedOutputCount = 0;
     const Cache *m_cache = nullptr;
-    const TaskFuncRegistry<TaskFunc> *m_taskFuncRegistry = nullptr;
 
     // Elements are taskIds of tasks with all inputs available, whose processing has not started yet.
     std::unordered_set<std::size_t> m_ready;
 
     void startPriv(
-            TaskGraph *taskGraph,
-            boost::any& cache,
-            const TaskFuncRegistry<TaskFunc> *taskFuncRegistry)
+            TaskGraphExecutorStartParam<TaskFunc>&& startParam)
     {
         BOOST_ASSERT(!m_running);
-        BOOST_ASSERT(!m_taskGraph);
+        m_startParam = std::move(startParam);
         BOOST_ASSERT(!m_cache);
-        BOOST_ASSERT(!m_taskFuncRegistry);
         m_running = true;
-        m_taskGraph = taskGraph;
         m_totalComputedOutputCount = 0;
-        auto mcache = &boost::any_cast<Cache&>(cache);
+        auto mcache = &boost::any_cast<Cache&>(m_startParam.cache);
         m_cache = mcache;
-        m_taskFuncRegistry = taskFuncRegistry;
         if (mcache->roots.empty()) {
             // Build cache
 
-            auto taskCount = m_taskGraph->taskInfo.size();
+            auto taskCount = m_startParam.taskGraph->taskInfo.size();
 
             // Compute i2o and o2i maps
             BOOST_ASSERT(mcache->o2i.empty());
             std::map<InputEndPoint, OutputEndPoint> i2o;
-            for (auto& c : m_taskGraph->connections) {
+            for (auto& c : m_startParam.taskGraph->connections) {
                 i2o[c.to] = c.from;
                 mcache->o2i.insert({c.from, c.to});
             }
@@ -195,12 +303,12 @@ private:
             // taskIoDataIdx, and dataPtrs
             mcache->initAvailTaskInputs.resize(taskCount);
             mcache->taskIoDataIdx.resize(taskCount);
-            mcache->dataPtrs.resize(m_taskGraph->dataMap.size());
+            mcache->dataPtrs.resize(m_startParam.taskGraph->dataMap.size());
             std::size_t idataPtrs = 0;
             BOOST_ASSERT(mcache->totalOutputCount == 0);
             for (std::size_t taskId=0; taskId<taskCount; ++taskId) {
                 // Compute available inputs
-                auto& ti = m_taskGraph->taskInfo[taskId];
+                auto& ti = m_startParam.taskGraph->taskInfo[taskId];
                 std::size_t availInputCount = 0;
                 for (std::size_t inputPort=0; inputPort<ti.task.inputCount; ++inputPort)
                     if (i2o.find({taskId, inputPort}) == i2o.end())
@@ -218,11 +326,11 @@ private:
                 mcache->taskIoDataIdx[taskId].inputIndex = idataPtrs;
                 for (std::size_t inputPort=0; inputPort<ti.task.inputCount; ++inputPort)
                     mcache->dataPtrs[idataPtrs++] =
-                            &m_taskGraph->data[m_taskGraph->dataMap[ti.inputIndex+inputPort]];
+                            &m_startParam.taskGraph->data[m_startParam.taskGraph->dataMap[ti.inputIndex+inputPort]];
                 mcache->taskIoDataIdx[taskId].outputIndex = idataPtrs;
                 for (std::size_t outputPort=0; outputPort<ti.task.outputCount; ++outputPort)
                     mcache->dataPtrs[idataPtrs++] =
-                            &m_taskGraph->data[m_taskGraph->dataMap[ti.outputIndex+outputPort]];
+                            &m_startParam.taskGraph->data[m_startParam.taskGraph->dataMap[ti.outputIndex+outputPort]];
             }
             mcache->availTaskInputs = mcache->initAvailTaskInputs;
         }
@@ -242,7 +350,7 @@ private:
         // Start tasks
         std::vector<std::size_t> justStarted;
         for (auto& taskId : m_ready) {
-            auto& ti = m_taskGraph->taskInfo[taskId];
+            auto& ti = m_startParam.taskGraph->taskInfo[taskId];
             auto it = m_resourceInfo.find(ti.task.resourceType);
             if (it == m_resourceInfo.end())
                 throw std::runtime_error("TaskGraphExecutor: No suitable resources are supplied");
@@ -255,11 +363,12 @@ private:
                 auto outputIndex = m_cache->taskIoDataIdx[taskId].outputIndex;
                 auto inputIndex = m_cache->taskIoDataIdx[taskId].inputIndex;
                 xi.executor->start(
-                            ti.task,
-                            { d+outputIndex, d+outputIndex+ti.task.outputCount },
-                            { d+inputIndex, d+inputIndex+ti.task.inputCount },
-                            [](){},
-                            *m_taskFuncRegistry);
+                    makeTaskExecutorStartParam<TaskFunc>(
+                        ti.task,
+                        { d+outputIndex, d+outputIndex+ti.task.outputCount },
+                        { d+inputIndex, d+inputIndex+ti.task.inputCount },
+                        m_startParam.taskFuncRegistry,
+                        m_cancelParam));
                 ++ri.runningExecutorCount;
                 justStarted.push_back(taskId);
             }
@@ -271,7 +380,33 @@ private:
 
         return !justStarted.empty();
     }
+
+    void setNonRunningState()
+    {
+        m_running = false;
+        m_startParam = TaskGraphExecutorStartParam<TaskFunc>::makeInvalidInstance();
+        m_cache = nullptr;
+    }
+
+    friend void cancel<TaskFunc>(TaskGraphExecutor<TaskFunc>& x);
+    friend void requestCancel<TaskFunc>(TaskGraphExecutor<TaskFunc>& x);
 };
+
+template <class TaskFunc>
+inline void cancel(TaskGraphExecutor<TaskFunc>& x)
+{
+    if (x.isRunning()) {
+        x.m_cancelParam = true;
+        x.join();
+    }
+}
+
+template <class TaskFunc>
+inline void requestCancel(TaskGraphExecutor<TaskFunc>& x)
+{
+    if (x.isRunning())
+        x.m_cancelParam = true;
+}
 
 } // namespace task_engine
 } // namespace silver_bullets

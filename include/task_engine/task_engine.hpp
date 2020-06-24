@@ -5,3 +5,4 @@
 #include "ThreadedTaskExecutor.hpp"
 #include "SimpleTaskFunc.hpp"
 #include "StatefulTaskFunc.hpp"
+#include "StatefulCancellableTaskFunc.hpp"
