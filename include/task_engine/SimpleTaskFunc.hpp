@@ -3,6 +3,7 @@
 #include "types.hpp"
 #include "TaskFuncRegistry.hpp"
 #include "Task.hpp"
+#include "TaskExecutorCancelParam.hpp"
 
 #include "func/func_arg_convert.hpp"
 
@@ -49,50 +50,34 @@ struct TaskFuncTraits<SimpleTaskFunc>
 {
     struct ThreadLocalData {};
     struct ReadOnlySharedData {};
-    static void setTaskFuncResources(
-            ThreadLocalData*,
-            const ReadOnlySharedData*,
-            SimpleTaskFunc&)
-    {}
 };
 
-
+template<> struct IsCancellable<SimpleTaskFunc> : std::false_type {};
 
 template<> class ThreadedTaskExecutorInit<SimpleTaskFunc>
 {
 public:
-    ThreadedTaskExecutorInit() = default;
-    TaskFuncTraits<SimpleTaskFunc>::ThreadLocalData operator()() const {
+    ThreadedTaskExecutorInit(const TaskFuncRegistry<SimpleTaskFunc> *taskFuncRegistry) :
+        taskFuncRegistry(taskFuncRegistry)
+    {}
+    TaskFuncTraits<SimpleTaskFunc>::ThreadLocalData initThreadLocalData() const {
         return {};
     }
+    const TaskFuncRegistry<SimpleTaskFunc> *taskFuncRegistry;
+    TaskExecutorCancelParam_t<SimpleTaskFunc> cancelParam;
 };
 
-template<> struct TaskExecutorStartParam<SimpleTaskFunc>
+template<>
+inline void callTaskFunc<SimpleTaskFunc>(
+        const SimpleTaskFunc& f,
+        const pany_range& outputs,
+        const const_pany_range& inputs,
+        const TaskExecutorCancelParam_t<SimpleTaskFunc>&,
+        typename TaskFuncTraits<SimpleTaskFunc>::ThreadLocalData*,
+        const typename TaskFuncTraits<SimpleTaskFunc>::ReadOnlySharedData*)
 {
-    Task task;
-    pany_range outputs;
-    const_pany_range inputs;
-    std::reference_wrapper<const TaskFuncRegistry<SimpleTaskFunc>> taskFuncRegistry;
-    std::function<void()> cb;
-
-    void callTaskFunc(SimpleTaskFunc& taskFunc) const {
-        taskFunc(outputs, inputs);
-    }
-
-    static TaskExecutorStartParam<SimpleTaskFunc> makeInvalidInstance()
-    {
-        static constexpr const TaskFuncRegistry<SimpleTaskFunc>* ptfr = nullptr;
-        return {
-            Task(),
-            pany_range(),
-            const_pany_range(),
-            *ptfr,
-            std::function<void()>()
-        };
-    }
-};
-
-template<> struct IsCancellable<SimpleTaskFunc> : std::false_type {};
+    f(outputs, inputs);
+}
 
 } // namespace task_engine
 } // namespace silver_bullets

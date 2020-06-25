@@ -21,8 +21,6 @@ using namespace silver_bullets::task_engine;
 //     7
 void test_01()
 {
-    cout << endl << "=== test_01() ===" << endl;
-
     using TaskFunc = SimpleTaskFunc;
     using TFR = TaskFuncRegistry<TaskFunc>;
     using TTX = ThreadedTaskExecutor<TaskFunc>;
@@ -51,10 +49,10 @@ void test_01()
 
     TGX x;
     for (auto i=0; i<10; ++i)
-        x.addTaskExecutor(std::make_shared<TTX>(resType));
+        x.addTaskExecutor(std::make_shared<TTX>(resType, &taskFuncRegistry));
 
     auto cache = x.makeCache();
-    x.start(&g, cache, &taskFuncRegistry).join();
+    x.start(&g, cache).join();
 
     cout << boost::any_cast<int>(g.output(task2, 0)) << endl;
 }
@@ -85,8 +83,6 @@ void test_01()
 //           72
 void test_02()
 {
-    cout << endl << "=== test_02() ===" << endl;
-
     using TaskFunc = SimpleTaskFunc;
     using TFR = TaskFuncRegistry<TaskFunc>;
     using TTX = ThreadedTaskExecutor<TaskFunc>;
@@ -104,7 +100,7 @@ void test_02()
 
     TGX x;
     for (auto i=0; i<10; ++i)
-        x.addTaskExecutor(std::make_shared<TTX>(resType));
+        x.addTaskExecutor(std::make_shared<TTX>(resType, &taskFuncRegistry));
 
     auto N = 4;
     std::vector<size_t> topTasks;
@@ -137,7 +133,7 @@ void test_02()
     bool syncMode = true;
     if (syncMode) {
         // Call computation synchronously
-        x.start(&g, cache, &taskFuncRegistry);
+        x.start(&g, cache);
         x.join();
     }
     else {
@@ -145,7 +141,7 @@ void test_02()
         // however, to get that callback called from the main thread,
         // we need to call propagateCb() sometimes.
         auto done = false;
-        x.start(&g, cache, &taskFuncRegistry, [&done]() {
+        x.start(&g, cache, [&done]() {
             done = true;
         });
         while (!done) {
@@ -186,8 +182,6 @@ void test_02()
 //            57
 void test_03()
 {
-    cout << endl << "=== test_03() ===" << endl;
-
     using TaskFunc = StatefulTaskFunc;
 
     // Outputs the sum of the local state and all inputs
@@ -217,7 +211,7 @@ void test_03()
     auto resType = 1;
     boost::any readOnlySharedData = 2;
     for (auto i=0; i<10; ++i) {
-        auto tx = std::make_shared<TTX>(resType, [](){ return boost::any(1); });
+        auto tx = std::make_shared<TTX>(resType, &taskFuncRegistry, [](){ return boost::any(1); });
         tx->setReadOnlySharedData(&readOnlySharedData);
         x.addTaskExecutor(tx);
     }
@@ -247,11 +241,10 @@ void test_03()
 
     auto g = b.taskGraph();
     auto cache = x.makeCache();
-    x.start(&g, cache, &taskFuncRegistry).join();
+    x.start(&g, cache).join();
 
     cout << boost::any_cast<int>(g.output(t51, 0)) << endl;
 }
-
 
 // Example of use of a stateful cancellable task functions
 //
@@ -270,10 +263,9 @@ void test_03()
 //         +-----+
 //            |
 //            15
-void test_04()
+void test_04(const CancelController::Checker& isCancelled)
 {
-    cout << endl << "=== test_04() ===" << endl;
-
+    // TODO: use cancel
     using TaskFunc = StatefulCancellableTaskFunc;
 
     // Outputs the sum of the local state and all inputs
@@ -282,12 +274,12 @@ void test_04()
         void call(
                     const pany_range& out,
                     const const_pany_range& in,
-                    const std::atomic<bool>& cancel) const override
+                    const CancelController::Checker& isCancelled) const override
         {
             // Wait for 300 ms, but check if the computation is cancelled each 10 ms.
             for (auto x=0; x<30; ++x) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                if (cancel)
+                if (isCancelled)
                     return;
             }
             auto result =
@@ -307,11 +299,11 @@ void test_04()
     TFR taskFuncRegistry;
     taskFuncRegistry[computeFuncId] = TaskFunc(make_shared<ComputeFunc>());
 
-    TGX x;
+    TGX x(isCancelled);
     auto resType = 1;
     boost::any readOnlySharedData = 2;
     for (auto i=0; i<5; ++i) {
-        auto tx = std::make_shared<TTX>(resType, [](){ return boost::any(1); });
+        auto tx = std::make_shared<TTX>(resType, &taskFuncRegistry, [](){ return boost::any(1); }, isCancelled);
         tx->setReadOnlySharedData(&readOnlySharedData);
         x.addTaskExecutor(tx);
     }
@@ -328,7 +320,7 @@ void test_04()
 
     auto g = b.taskGraph();
     auto cache = x.makeCache();
-    x.start(&g, cache, &taskFuncRegistry);
+    x.start(&g, cache);
     cout << "Started..." << endl;
 
     using namespace std::chrono;
@@ -340,23 +332,64 @@ void test_04()
         cout << "Time elapsed: " << duration_cast<milliseconds>(duration).count() << " ms" << endl;
     };
 
-    if (x.maybeJoin(std::chrono::milliseconds(1000)))
-        cout << boost::any_cast<int>(g.output(t31, 0)) << endl;
-    else {
-        cout << "Cancelling... ";
-        cancel(x);
+    x.join();
+
+    if (isCancelled)
         cout << "cancelled" << endl;
-    }
+    else
+        cout << boost::any_cast<int>(g.output(t31, 0)) << endl;
 
     reportTimeElapsed();
 }
 
 int main()
 {
-    test_01();
-    test_02();
-    test_03();
-    test_04();
+    TaskQueueFuncRegistry funcRegistry;
+
+    funcRegistry[0] = [](boost::any& threadLocalState, const CancelController::Checker&)
+    {
+        cout << "********** SETTING THREAD LOCAL STATE TO 42 **********" << endl;
+        threadLocalState = 42;
+        cout << "********** STARTING test_01 **********" << endl;
+        test_01();
+        cout << "********** FINISHED test_01 **********" << endl << endl;
+    };
+
+    funcRegistry[1] = [](boost::any&, const CancelController::Checker&)
+    {
+        cout << "********** STARTING test_02 **********" << endl;
+        test_02();
+        cout << "********** FINISHED test_02 **********" << endl << endl;
+    };
+
+    funcRegistry[2] = [](boost::any&, const CancelController::Checker&)
+    {
+        cout << "********** STARTING test_03 **********" << endl;
+        test_03();
+        cout << "********** FINISHED test_03 **********" << endl << endl;
+    };
+
+    funcRegistry[3] = [](boost::any& threadLocalState, const CancelController::Checker& isCancelled)
+    {
+        cout << "********** READING THREAD LOCAL STATE: "
+             << boost::any_cast<int>(threadLocalState) << " **********" << endl;
+        cout << "********** STARTING test_04 **********" << endl;
+        test_04(isCancelled);
+        cout << "********** FINISHED test_04 **********" << endl << endl;
+    };
+
+    CancelController cc;
+
+    TaskQueueExecutor x(cc.checker());
+    x.setTaskFuncRegistry(&funcRegistry);
+
+    x.post(0);
+    x.post(1);
+    x.post(2);
+    x.wait();
+    x.post(3);
+    this_thread::sleep_for(chrono::milliseconds(100));
+    // cc.canceller().cancel();
 
     return 0;
 }

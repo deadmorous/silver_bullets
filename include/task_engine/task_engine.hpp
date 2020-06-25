@@ -6,3 +6,5 @@
 #include "SimpleTaskFunc.hpp"
 #include "StatefulTaskFunc.hpp"
 #include "StatefulCancellableTaskFunc.hpp"
+
+#include "TaskQueueExecutor.hpp"

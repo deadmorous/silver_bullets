@@ -22,10 +22,13 @@ public:
 
     template<class ... InitArgs>
     explicit ThreadedTaskExecutor(
-            int resourceType, InitArgs ... initArgs) :
+            int resourceType,
+            const TaskFuncRegistry<TaskFunc> *taskRegistry,
+            InitArgs ... initArgs) :
         m_resourceType(resourceType),
-        m_thread([this, init = ThreadedTaskExecutorInit<TaskFunc> (initArgs...)]() {
-            run(init);
+        m_initParam(ThreadedTaskExecutorInit<TaskFunc> (taskRegistry, initArgs...)),
+        m_thread([this]() {
+            run();
         })
     {}
 
@@ -42,11 +45,9 @@ public:
         return m_resourceType;
     }
 
-    void doStart(TaskExecutorStartParam<TaskFunc>&& startParam) override
+    void doStart(TaskExecutorStartParam&& startParam) override
     {
-        BOOST_ASSERT(!m_f);
         m_startParam = std::move(startParam);
-        m_f = m_startParam.taskFuncRegistry.get().at(m_startParam.task.taskFuncId);
         std::unique_lock<std::mutex> lk(m_incomingTaskNotifier.mutex());
         m_flags = HasInput;
         lk.unlock();
@@ -60,8 +61,7 @@ public:
             m_flags = 0;
             if (m_startParam.cb)
                 m_startParam.cb();
-            m_f = TaskFunc();
-            m_startParam = TaskExecutorStartParam<TaskFunc>::makeInvalidInstance();
+            m_startParam = TaskExecutorStartParam();
             return true;
         }
         else
@@ -86,9 +86,8 @@ public:
 
 private:
     int m_resourceType;
-    TaskFunc m_f;
-    TaskExecutorStartParam<TaskFunc> m_startParam =
-            TaskExecutorStartParam<TaskFunc>::makeInvalidInstance();
+    ThreadedTaskExecutorInit<TaskFunc> m_initParam;
+    TaskExecutorStartParam m_startParam;
     ThreadNotifier m_incomingTaskNotifier;
     ThreadNotifier *m_taskCompletionNotifier = nullptr;
     enum {
@@ -107,20 +106,22 @@ private:
     // are initialized before the thread starts.
     std::thread m_thread;
 
-    void run(const ThreadedTaskExecutorInit<TaskFunc>& init) {
-        m_threadLocalData = init();
+    void run()
+    {
+        m_threadLocalData = m_initParam.initThreadLocalData();
         while (true) {
             m_incomingTaskNotifier.wait();
             if (m_flags & ExitRequested)
                 return;
             else if (m_flags & HasInput) {
-                TaskFuncTraits<TaskFunc>::setTaskFuncResources(
-                            &m_threadLocalData,
-                            m_readOnlySharedData,
-                            m_f);
-                m_startParam.callTaskFunc(m_f);
+                auto& f = m_initParam.taskFuncRegistry->at(m_startParam.task.taskFuncId);
+                callTaskFunc(
+                    f, m_startParam.outputs, m_startParam.inputs,
+                    m_initParam.cancelParam,
+                    &m_threadLocalData, m_readOnlySharedData);
                 std::unique_lock<std::mutex> lk(m_incomingTaskNotifier.mutex());
                 m_flags = HasOutput;
+                lk.unlock();
                 if (m_taskCompletionNotifier)
                     m_taskCompletionNotifier->notify_all();
             }

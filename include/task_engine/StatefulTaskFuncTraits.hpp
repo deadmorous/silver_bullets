@@ -1,6 +1,8 @@
 #pragma once
 
 #include "types.hpp"
+#include "TaskFuncRegistry.hpp"
+
 #include <functional>
 
 namespace silver_bullets {
@@ -11,16 +13,6 @@ struct StatefulTaskFuncTraits
 {
     using ThreadLocalData = boost::any;
     using ReadOnlySharedData = boost::any;
-
-    static void setTaskFuncResources(
-            ThreadLocalData* threadLocalData,
-            const ReadOnlySharedData* readOnlySharedData,
-            TaskFunc& taskFunc)
-    {
-        auto func = taskFunc.func();
-        func->setThreadLocalData(threadLocalData);
-        func->setReadOnlySharedData(readOnlySharedData);
-    }
 };
 
 template<class TaskFunc>
@@ -28,12 +20,16 @@ class StatefulThreadedTaskExecutorInit
 {
 public:
     template<class F>
-    explicit StatefulThreadedTaskExecutorInit(const F& init) :
+    explicit StatefulThreadedTaskExecutorInit(
+            const TaskFuncRegistry<TaskFunc> *taskFuncRegistry,
+            const F& init) :
+        taskFuncRegistry(taskFuncRegistry),
         m_init(init)
     {}
-    typename TaskFuncTraits<TaskFunc>::ThreadLocalData operator()() const {
+    typename TaskFuncTraits<TaskFunc>::ThreadLocalData initThreadLocalData() const {
         return m_init();
     }
+    const TaskFuncRegistry<TaskFunc> *taskFuncRegistry;
 private:
     std::function<boost::any()> m_init;
 };

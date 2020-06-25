@@ -8,7 +8,6 @@
 #include <memory>
 #include <thread>
 #include <unordered_set>
-#include <atomic>
 
 #include <boost/range/algorithm/copy.hpp>
 #include <boost/assert.hpp>
@@ -16,119 +15,26 @@
 namespace silver_bullets {
 namespace task_engine {
 
-template<class TaskFunc>
-struct TaskExecutorCancelParam<TaskFunc, std::enable_if_t<IsCancellable_v<TaskFunc>, void>>
-{
-    using type = std::atomic<bool>;
-    static constexpr bool initializer() noexcept { return 0; }
-    static constexpr bool isCancelled(const type& c) {
-        return c;
-    }
-};
-
-template<class TaskFunc>
-struct TaskExecutorCancelParam<TaskFunc, std::enable_if_t<!IsCancellable_v<TaskFunc>, void>>
-{
-    struct type {};
-    static constexpr type initializer() noexcept { return {}; }
-    static constexpr bool isCancelled(const type&) {
-        return false;
-    }
-};
-
-template <class TaskFunc>
 struct TaskGraphExecutorStartParam
 {
-    TaskGraph *taskGraph;
-    std::reference_wrapper<boost::any> cache;
-    std::reference_wrapper<const TaskFuncRegistry<TaskFunc>> taskFuncRegistry;
+    TaskGraph *taskGraph = nullptr;
+    boost::any *cache = nullptr;
     std::function<void()> cb;
-
-    static TaskGraphExecutorStartParam<TaskFunc> makeInvalidInstance()
-    {
-        static constexpr const TaskFuncRegistry<TaskFunc>* ptfr = nullptr;
-        static constexpr boost::any *pcache = nullptr;
-        return {
-            nullptr,
-            *pcache,
-            *ptfr,
-            std::function<void()>()
-        };
-    }
-
-    template<bool cancellable, class ... Args>
-    TaskExecutorStartParam<TaskFunc> makeTaskExecutorStartParam(
-            const Task& task,
-            const pany_range& outputs,
-            const const_pany_range& inputs,
-            const TaskFuncRegistry<TaskFunc>& taskFuncRegistry,
-            TaskExecutorCancelParam_t<TaskFunc> cancelParam,
-            Args&& ... args) const
-    {
-        return { task, outputs, inputs, taskFuncRegistry, std::forward<Args>(args) ... };
-    }
 };
 
 template<class TaskFunc, bool cancellable> struct TaskExecutorStartParamMaker;
-
-template<class TaskFunc>
-struct TaskExecutorStartParamMaker<TaskFunc, false>
-{
-    template<class ... Args>
-    static TaskExecutorStartParam<TaskFunc> make(
-                const Task& task,
-                const pany_range& outputs,
-                const const_pany_range& inputs,
-                const TaskFuncRegistry<TaskFunc>& taskFuncRegistry,
-                TaskExecutorCancelParam_t<TaskFunc>& /*cancelParam*/,
-                Args&& ... args)
-        {
-            return { task, outputs, inputs, taskFuncRegistry, std::forward<Args>(args) ... };
-        }
-};
-
-template<class TaskFunc>
-struct TaskExecutorStartParamMaker<TaskFunc, true>
-{
-    template<class ... Args>
-    static TaskExecutorStartParam<TaskFunc> make(
-                const Task& task,
-                const pany_range& outputs,
-                const const_pany_range& inputs,
-                const TaskFuncRegistry<TaskFunc>& taskFuncRegistry,
-                TaskExecutorCancelParam_t<TaskFunc>& cancelParam,
-                Args&& ... args)
-        {
-            return { task, outputs, inputs, taskFuncRegistry, cancelParam, std::forward<Args>(args) ... };
-        }
-};
-
-template<class TaskFunc, class ... Args>
-inline TaskExecutorStartParam<TaskFunc> makeTaskExecutorStartParam(
-        const Task& task,
-        const pany_range& outputs,
-        const const_pany_range& inputs,
-        const TaskFuncRegistry<TaskFunc>& taskFuncRegistry,
-        TaskExecutorCancelParam_t<TaskFunc>& cancelParam,
-        Args&& ... args)
-{
-    return TaskExecutorStartParamMaker<TaskFunc, IsCancellable_v<TaskFunc>>::make(
-        task, outputs, inputs, taskFuncRegistry, cancelParam, args ...);
-}
-
-template <class TaskFunc> class TaskGraphExecutor;
-
-template <class TaskFunc>
-inline void cancel(TaskGraphExecutor<TaskFunc>& x);
-
-template <class TaskFunc>
-inline void requestCancel(TaskGraphExecutor<TaskFunc>& x);
 
 template <class TaskFunc>
 class TaskGraphExecutor
 {
 public:
     using Cb = std::function<void()>;
+
+    template<class ... Args>
+    explicit TaskGraphExecutor(Args&& ... args) :
+        m_cancelParam(std::forward<Args>(args)...)
+    {
+    }
 
     TaskGraphExecutor& addTaskExecutor(const std::shared_ptr<TaskExecutor<TaskFunc>>& taskExecutor)
     {
@@ -145,10 +51,9 @@ public:
     TaskGraphExecutor& start(
             TaskGraph *taskGraph,
             boost::any& cache,
-            const TaskFuncRegistry<TaskFunc> *taskFuncRegistry,
             Args&& ... args)
     {
-        startPriv(TaskGraphExecutorStartParam<TaskFunc>{ taskGraph, cache, *taskFuncRegistry, args... });
+        startPriv({ taskGraph, &cache, args... });
         return *this;
     }
 
@@ -162,25 +67,23 @@ public:
             m_taskCompletionNotifier.wait();
             propagateCb();
         }
-        m_cancelParam = TaskExecutorCancelParam<TaskFunc>::initializer();
         return *this;
     }
 
     template< class Rep, class Period >
-    bool maybeJoin(const std::chrono::duration<Rep, Period>& rel_time)
+    bool maybeJoin(const std::chrono::duration<Rep, Period>& timeout)
     {
-        auto end_time = std::chrono::system_clock::now() + rel_time;
-        auto timeout = rel_time;
+        auto endTime = std::chrono::system_clock::now() + timeout;
+        auto remainingTimeout = timeout;
         while(m_running) {
-            if (!m_taskCompletionNotifier.wait_for(timeout))
+            if (!m_taskCompletionNotifier.wait_for(remainingTimeout))
                 return false;
-            auto now = std::chrono::system_clock::now();
-            if (now >= end_time)
+            auto currentTime = std::chrono::system_clock::now();
+            if (currentTime >= endTime)
                 return false;
-            timeout = std::chrono::duration_cast<decltype (timeout)>(end_time - now);
+            remainingTimeout = std::chrono::duration_cast<decltype (remainingTimeout)>(endTime - currentTime);
             propagateCb();
         }
-        m_cancelParam = TaskExecutorCancelParam<TaskFunc>::initializer();
         return true;
     }
 
@@ -250,6 +153,10 @@ public:
         return !m_running;
     }
 
+    TaskExecutorCancelParam_t<TaskFunc>& cancelParam() {
+        return m_cancelParam;
+    }
+
 private:
     struct ExecutorInfo {
         std::shared_ptr<TaskExecutor<TaskFunc>> executor;
@@ -261,8 +168,7 @@ private:
         std::size_t runningExecutorCount = 0;   // Running are all at the beginning of executors
     };
 
-    TaskExecutorCancelParam_t<TaskFunc> m_cancelParam =
-            TaskExecutorCancelParam<TaskFunc>::initializer();
+    TaskExecutorCancelParam_t<TaskFunc> m_cancelParam;
 
     ThreadNotifier m_taskCompletionNotifier;
     std::map<int, ResourceInfo> m_resourceInfo;
@@ -290,23 +196,21 @@ private:
     };
 
     bool m_running = false;
-    TaskGraphExecutorStartParam<TaskFunc> m_startParam =
-            TaskGraphExecutorStartParam<TaskFunc>::makeInvalidInstance();
+    TaskGraphExecutorStartParam m_startParam;
     std::size_t m_totalComputedOutputCount = 0;
     const Cache *m_cache = nullptr;
 
     // Elements are taskIds of tasks with all inputs available, whose processing has not started yet.
     std::unordered_set<std::size_t> m_ready;
 
-    void startPriv(
-            TaskGraphExecutorStartParam<TaskFunc>&& startParam)
+    void startPriv(TaskGraphExecutorStartParam&& startParam)
     {
         BOOST_ASSERT(!m_running);
         m_startParam = std::move(startParam);
         BOOST_ASSERT(!m_cache);
         m_running = true;
         m_totalComputedOutputCount = 0;
-        auto mcache = &boost::any_cast<Cache&>(m_startParam.cache);
+        auto mcache = &boost::any_cast<Cache&>(*m_startParam.cache);
         m_cache = mcache;
         if (mcache->roots.empty()) {
             // Build cache
@@ -385,12 +289,9 @@ private:
                 auto outputIndex = m_cache->taskIoDataIdx[taskId].outputIndex;
                 auto inputIndex = m_cache->taskIoDataIdx[taskId].inputIndex;
                 xi.executor->start(
-                    makeTaskExecutorStartParam<TaskFunc>(
                         ti.task,
                         { d+outputIndex, d+outputIndex+ti.task.outputCount },
-                        { d+inputIndex, d+inputIndex+ti.task.inputCount },
-                        m_startParam.taskFuncRegistry,
-                        m_cancelParam));
+                        { d+inputIndex, d+inputIndex+ti.task.inputCount });
                 ++ri.runningExecutorCount;
                 justStarted.push_back(taskId);
             }
@@ -406,29 +307,10 @@ private:
     void setNonRunningState()
     {
         m_running = false;
-        m_startParam = TaskGraphExecutorStartParam<TaskFunc>::makeInvalidInstance();
+        m_startParam = TaskGraphExecutorStartParam();
         m_cache = nullptr;
     }
-
-    friend void cancel<TaskFunc>(TaskGraphExecutor<TaskFunc>& x);
-    friend void requestCancel<TaskFunc>(TaskGraphExecutor<TaskFunc>& x);
 };
-
-template <class TaskFunc>
-inline void cancel(TaskGraphExecutor<TaskFunc>& x)
-{
-    if (x.isRunning()) {
-        x.m_cancelParam = true;
-        x.join();
-    }
-}
-
-template <class TaskFunc>
-inline void requestCancel(TaskGraphExecutor<TaskFunc>& x)
-{
-    if (x.isRunning())
-        x.m_cancelParam = true;
-}
 
 } // namespace task_engine
 } // namespace silver_bullets

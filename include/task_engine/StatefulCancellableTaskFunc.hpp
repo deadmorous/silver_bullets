@@ -1,11 +1,11 @@
 #pragma once
 
 #include "StatefulTaskFuncTraits.hpp"
-#include "TaskFuncRegistry.hpp"
 #include "Task.hpp"
+#include "TaskExecutorCancelParam.hpp"
+#include "sync/CancelController.hpp"
 
 #include <memory>
-#include <atomic>
 
 namespace silver_bullets {
 namespace task_engine {
@@ -16,7 +16,7 @@ public:
     virtual void call(
             const pany_range& out,
             const const_pany_range& in,
-            const std::atomic<bool>& cancel) const = 0;
+            const CancelController::Checker& isCancelled) const = 0;
 
     void setThreadLocalData(boost::any *threadLocalData) {
         m_threadLocalData = threadLocalData;
@@ -43,18 +43,19 @@ class StatefulCancellableTaskFunc
 {
 public:
     StatefulCancellableTaskFunc() = default;
-    explicit StatefulCancellableTaskFunc(const std::shared_ptr<StatefulCancellableTaskFuncInterface>& statefulTaskFunc) :
+    explicit StatefulCancellableTaskFunc(
+            const std::shared_ptr<StatefulCancellableTaskFuncInterface>& statefulTaskFunc) :
         m_statefulTaskFunc(statefulTaskFunc)
     {}
     void operator()(
             const pany_range& out,
             const const_pany_range& in,
-            const std::atomic<bool>& cancel)
+            const CancelController::Checker& cancel) const
     {
         m_statefulTaskFunc->call(out, in, cancel);
     }
 
-    StatefulCancellableTaskFuncInterface *func() {
+    StatefulCancellableTaskFuncInterface *func() const {
         return m_statefulTaskFunc.get();
     }
 
@@ -69,45 +70,37 @@ template<> struct TaskFuncTraits<StatefulCancellableTaskFunc> :
         public StatefulTaskFuncTraits<StatefulCancellableTaskFunc>
 {};
 
+template<> struct IsCancellable<StatefulCancellableTaskFunc> : std::true_type {};
+
 template<> class ThreadedTaskExecutorInit<StatefulCancellableTaskFunc> :
         public StatefulThreadedTaskExecutorInit<StatefulCancellableTaskFunc>
 {
 public:
     template<class F>
-    explicit ThreadedTaskExecutorInit(const F& init) :
-        StatefulThreadedTaskExecutorInit<StatefulCancellableTaskFunc>(init)
+    explicit ThreadedTaskExecutorInit(
+            const TaskFuncRegistry<StatefulCancellableTaskFunc> *taskFuncRegistry,
+            const F& init,
+            const TaskExecutorCancelParam_t<StatefulCancellableTaskFunc>& cp) :
+        StatefulThreadedTaskExecutorInit<StatefulCancellableTaskFunc>(taskFuncRegistry, init),
+        cancelParam(cp)
     {}
+    TaskExecutorCancelParam_t<StatefulCancellableTaskFunc> cancelParam;
 };
 
-template<> struct TaskExecutorStartParam<StatefulCancellableTaskFunc>
+template<>
+inline void callTaskFunc<StatefulCancellableTaskFunc>(
+        const StatefulCancellableTaskFunc& f,
+        const pany_range& outputs,
+        const const_pany_range& inputs,
+        const TaskExecutorCancelParam_t<StatefulCancellableTaskFunc>& cancelParam,
+        typename TaskFuncTraits<StatefulCancellableTaskFunc>::ThreadLocalData* threadLocalData,
+        const typename TaskFuncTraits<StatefulCancellableTaskFunc>::ReadOnlySharedData* readOnlySharedData)
 {
-    Task task;
-    pany_range outputs;
-    const_pany_range inputs;
-    std::reference_wrapper<const TaskFuncRegistry<StatefulCancellableTaskFunc>> taskFuncRegistry;
-    std::reference_wrapper<std::atomic<bool>> cancel;
-    std::function<void()> cb;
-
-    void callTaskFunc(StatefulCancellableTaskFunc& taskFunc) const {
-        taskFunc(outputs, inputs, cancel);
-    }
-
-    static TaskExecutorStartParam<StatefulCancellableTaskFunc> makeInvalidInstance()
-    {
-        static constexpr const TaskFuncRegistry<StatefulCancellableTaskFunc>* ptfr = nullptr;
-        static constexpr std::atomic<bool> *pcancel = nullptr;
-        return {
-            Task(),
-            pany_range(),
-            const_pany_range(),
-            *ptfr,
-            *pcancel,
-            std::function<void()>()
-        };
-    }
-};
-
-template<> struct IsCancellable<StatefulCancellableTaskFunc> : std::true_type {};
+    auto func = f.func();
+    func->setThreadLocalData(threadLocalData);
+    func->setReadOnlySharedData(readOnlySharedData);
+    func->call(outputs, inputs, cancelParam);
+}
 
 } // namespace task_engine
 } // namespace silver_bullets
