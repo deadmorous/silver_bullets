@@ -9,13 +9,6 @@ namespace silver_bullets {
 namespace task_engine {
 
 template<class TaskFunc>
-struct StatefulTaskFuncTraits
-{
-    using ThreadLocalData = boost::any;
-    using ReadOnlySharedData = boost::any;
-};
-
-template<class TaskFunc>
 class StatefulThreadedTaskExecutorInit
 {
 public:
@@ -26,7 +19,7 @@ public:
         taskFuncRegistry(taskFuncRegistry),
         m_init(init)
     {}
-    typename TaskFuncTraits<TaskFunc>::ThreadLocalData initThreadLocalData() const {
+    boost::any initThreadLocalData() const {
         return m_init();
     }
     const TaskFuncRegistry<TaskFunc> *taskFuncRegistry;

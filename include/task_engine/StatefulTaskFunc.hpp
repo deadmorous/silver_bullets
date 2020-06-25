@@ -35,29 +35,17 @@ private:
     const boost::any *m_readOnlySharedData = nullptr;
 };
 
-class StatefulTaskFunc
-{
-public:
-    StatefulTaskFunc() = default;
-    explicit StatefulTaskFunc(const std::shared_ptr<StatefulTaskFuncInterface>& statefulTaskFunc) :
-        m_statefulTaskFunc(statefulTaskFunc)
-    {}
-    void operator()(const pany_range& out, const const_pany_range& in) const {
-        m_statefulTaskFunc->call(out, in);
-    }
-    StatefulTaskFuncInterface *func() const {
-        return m_statefulTaskFunc.get();
-    }
-    operator bool() const {
-        return !!m_statefulTaskFunc;
-    }
-private:
-    std::shared_ptr<StatefulTaskFuncInterface> m_statefulTaskFunc;
+using StatefulTaskFunc = std::shared_ptr<StatefulTaskFuncInterface>;
+
+template <>
+struct ThreadLocalData<StatefulTaskFunc> {
+    using type = boost::any;
 };
 
-template<> struct TaskFuncTraits<StatefulTaskFunc> :
-        StatefulTaskFuncTraits<StatefulTaskFunc>
-{};
+template <>
+struct ReadOnlySharedData<StatefulTaskFunc> {
+    using type = boost::any;
+};
 
 template<> struct IsCancellable<StatefulTaskFunc> : std::false_type {};
 
@@ -80,13 +68,13 @@ inline void callTaskFunc<StatefulTaskFunc>(
         const pany_range& outputs,
         const const_pany_range& inputs,
         const TaskExecutorCancelParam_t<StatefulTaskFunc>&,
-        typename TaskFuncTraits<StatefulTaskFunc>::ThreadLocalData* threadLocalData,
-        const typename TaskFuncTraits<StatefulTaskFunc>::ReadOnlySharedData* readOnlySharedData)
+        ThreadLocalData_t<StatefulTaskFunc>* threadLocalData,
+        const ReadOnlySharedData_t<StatefulTaskFunc>* readOnlySharedData)
 {
-    auto func = f.func();
-    func->setThreadLocalData(threadLocalData);
-    func->setReadOnlySharedData(readOnlySharedData);
-    func->call(outputs, inputs);
+    auto fp = f.get();
+    fp->setThreadLocalData(threadLocalData);
+    fp->setReadOnlySharedData(readOnlySharedData);
+    fp->call(outputs, inputs);
 }
 
 } // namespace task_engine

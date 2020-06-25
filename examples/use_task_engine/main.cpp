@@ -389,7 +389,7 @@ int main()
     x.wait();
     x.post(3);
     this_thread::sleep_for(chrono::milliseconds(100));
-    // cc.canceller().cancel();
+    cc.cancel();
 
     return 0;
 }

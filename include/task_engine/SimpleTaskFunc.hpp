@@ -45,11 +45,12 @@ template<class F> inline SimpleTaskFunc makeSimpleTaskFunc(F f)
 
 
 
-template<>
-struct TaskFuncTraits<SimpleTaskFunc>
-{
-    struct ThreadLocalData {};
-    struct ReadOnlySharedData {};
+template<> struct ThreadLocalData<SimpleTaskFunc> {
+    struct type {};
+};
+
+template<> struct ReadOnlySharedData<SimpleTaskFunc> {
+    struct type {};
 };
 
 template<> struct IsCancellable<SimpleTaskFunc> : std::false_type {};
@@ -60,7 +61,7 @@ public:
     ThreadedTaskExecutorInit(const TaskFuncRegistry<SimpleTaskFunc> *taskFuncRegistry) :
         taskFuncRegistry(taskFuncRegistry)
     {}
-    TaskFuncTraits<SimpleTaskFunc>::ThreadLocalData initThreadLocalData() const {
+    ThreadLocalData_t<SimpleTaskFunc> initThreadLocalData() const {
         return {};
     }
     const TaskFuncRegistry<SimpleTaskFunc> *taskFuncRegistry;
@@ -73,8 +74,8 @@ inline void callTaskFunc<SimpleTaskFunc>(
         const pany_range& outputs,
         const const_pany_range& inputs,
         const TaskExecutorCancelParam_t<SimpleTaskFunc>&,
-        typename TaskFuncTraits<SimpleTaskFunc>::ThreadLocalData*,
-        const typename TaskFuncTraits<SimpleTaskFunc>::ReadOnlySharedData*)
+        ThreadLocalData_t<SimpleTaskFunc>*,
+        const ReadOnlySharedData_t<SimpleTaskFunc>*)
 {
     f(outputs, inputs);
 }

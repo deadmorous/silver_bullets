@@ -11,7 +11,10 @@ namespace task_engine {
 using const_pany_range = boost::iterator_range<boost::any const* const*>;
 using pany_range = boost::iterator_range<boost::any* const*>;
 
-template<class TaskFunc> struct TaskFuncTraits;
+template<class TaskFunc> struct ThreadLocalData;
+template<class TaskFunc> using ThreadLocalData_t = typename ThreadLocalData<TaskFunc>::type;
+template<class TaskFunc> struct ReadOnlySharedData;
+template<class TaskFunc> using ReadOnlySharedData_t = typename ReadOnlySharedData<TaskFunc>::type;
 template<class TaskFunc> class ThreadedTaskExecutorInit;
 template<class TaskFunc> struct IsCancellable;
 
@@ -29,8 +32,8 @@ inline void callTaskFunc(
         const pany_range& outputs,
         const const_pany_range& inputs,
         const TaskExecutorCancelParam_t<TaskFunc>& cancelParam,
-        typename TaskFuncTraits<TaskFunc>::ThreadLocalData* threadLocalData,
-        const typename TaskFuncTraits<TaskFunc>::ReadOnlySharedData* readOnlySharedData);
+        ThreadLocalData_t<TaskFunc>* threadLocalData,
+        const ReadOnlySharedData_t<TaskFunc>* readOnlySharedData);
 
 } // namespace task_engine
 } // namespace silver_bullets

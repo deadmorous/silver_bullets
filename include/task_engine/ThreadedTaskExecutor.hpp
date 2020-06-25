@@ -18,7 +18,7 @@ class ThreadedTaskExecutor : public TaskExecutor<TaskFunc>
 {
 public:
     using Cb = typename TaskExecutor<TaskFunc>::Cb;
-    using ReadOnlySharedData = typename TaskFuncTraits<TaskFunc>::ReadOnlySharedData;
+    using ReadOnlySharedData = ReadOnlySharedData_t<TaskFunc>;
 
     template<class ... InitArgs>
     explicit ThreadedTaskExecutor(
@@ -97,7 +97,7 @@ private:
     };
     unsigned int m_flags = 0;   // A combination of elements of the above enum
 
-    using ThreadLocalData = typename TaskFuncTraits<TaskFunc>::ThreadLocalData;
+    using ThreadLocalData = ThreadLocalData_t<TaskFunc>;
 
     const ReadOnlySharedData *m_readOnlySharedData = nullptr;
     ThreadLocalData m_threadLocalData;

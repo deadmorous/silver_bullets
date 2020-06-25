@@ -39,36 +39,17 @@ private:
     const boost::any *m_readOnlySharedData = nullptr;
 };
 
-class StatefulCancellableTaskFunc
-{
-public:
-    StatefulCancellableTaskFunc() = default;
-    explicit StatefulCancellableTaskFunc(
-            const std::shared_ptr<StatefulCancellableTaskFuncInterface>& statefulTaskFunc) :
-        m_statefulTaskFunc(statefulTaskFunc)
-    {}
-    void operator()(
-            const pany_range& out,
-            const const_pany_range& in,
-            const CancelController::Checker& cancel) const
-    {
-        m_statefulTaskFunc->call(out, in, cancel);
-    }
+using StatefulCancellableTaskFunc = std::shared_ptr<StatefulCancellableTaskFuncInterface>;
 
-    StatefulCancellableTaskFuncInterface *func() const {
-        return m_statefulTaskFunc.get();
-    }
-
-    operator bool() const {
-        return !!m_statefulTaskFunc;
-    }
-private:
-    std::shared_ptr<StatefulCancellableTaskFuncInterface> m_statefulTaskFunc;
+template <>
+struct ThreadLocalData<StatefulCancellableTaskFunc> {
+    using type = boost::any;
 };
 
-template<> struct TaskFuncTraits<StatefulCancellableTaskFunc> :
-        public StatefulTaskFuncTraits<StatefulCancellableTaskFunc>
-{};
+template <>
+struct ReadOnlySharedData<StatefulCancellableTaskFunc> {
+    using type = boost::any;
+};
 
 template<> struct IsCancellable<StatefulCancellableTaskFunc> : std::true_type {};
 
@@ -93,13 +74,13 @@ inline void callTaskFunc<StatefulCancellableTaskFunc>(
         const pany_range& outputs,
         const const_pany_range& inputs,
         const TaskExecutorCancelParam_t<StatefulCancellableTaskFunc>& cancelParam,
-        typename TaskFuncTraits<StatefulCancellableTaskFunc>::ThreadLocalData* threadLocalData,
-        const typename TaskFuncTraits<StatefulCancellableTaskFunc>::ReadOnlySharedData* readOnlySharedData)
+        ThreadLocalData_t<StatefulCancellableTaskFunc>* threadLocalData,
+        const ReadOnlySharedData_t<StatefulCancellableTaskFunc>* readOnlySharedData)
 {
-    auto func = f.func();
-    func->setThreadLocalData(threadLocalData);
-    func->setReadOnlySharedData(readOnlySharedData);
-    func->call(outputs, inputs, cancelParam);
+    auto fp = f.get();
+    fp->setThreadLocalData(threadLocalData);
+    fp->setReadOnlySharedData(readOnlySharedData);
+    fp->call(outputs, inputs, cancelParam);
 }
 
 } // namespace task_engine
