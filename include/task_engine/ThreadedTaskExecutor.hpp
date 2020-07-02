@@ -45,6 +45,7 @@ public:
         return m_resourceType;
     }
 
+protected:
     void doStart(TaskExecutorStartParam&& startParam) override
     {
         m_startParam = std::move(startParam);
@@ -52,6 +53,24 @@ public:
         m_flags = HasInput;
         lk.unlock();
         m_incomingTaskNotifier.notify_one();
+    }
+
+public:
+    void wait()
+    {
+        BOOST_ASSERT(m_taskCompletionNotifier);
+        {
+            std::unique_lock<std::mutex> lk(m_incomingTaskNotifier.mutex());
+            if (!(m_flags & HasInput))
+                return; // Nothing is being done
+        }
+        while (true) {
+            std::unique_lock<std::mutex> lk(m_incomingTaskNotifier.mutex());
+            if (m_flags & HasOutput) {
+                lk.unlock();
+                m_taskCompletionNotifier->wait();
+            }
+        }
     }
 
     bool propagateCb() override
@@ -96,7 +115,6 @@ private:
         ExitRequested = 0x4
     };
     unsigned int m_flags = 0;   // A combination of elements of the above enum
-
     using ThreadLocalData = ThreadLocalData_t<TaskFunc>;
 
     const ReadOnlySharedData *m_readOnlySharedData = nullptr;
