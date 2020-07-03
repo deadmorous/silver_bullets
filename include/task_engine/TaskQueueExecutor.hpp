@@ -211,8 +211,12 @@ private:
             std::unique_lock<std::mutex> lk(m_incomingTaskNotifier.mutex());
             if (m_flags & ExitRequested)
                 return;
-            else if (m_cancelParam)
+            else if (m_cancelParam) {
                 m_taskQueue.clear();
+                m_flags = TaskCompleted;
+                lk.unlock();
+                m_taskCompletionNotifier.notify_all();
+            }
             else if (!m_taskQueue.empty()) {
                 auto task = m_taskQueue.front();
                 m_flags = TaskRunning;

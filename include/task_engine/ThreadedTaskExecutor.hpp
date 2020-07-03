@@ -66,7 +66,9 @@ public:
         }
         while (true) {
             std::unique_lock<std::mutex> lk(m_incomingTaskNotifier.mutex());
-            if (m_flags & HasOutput) {
+            if (m_flags & HasOutput)
+                return;
+            else {
                 lk.unlock();
                 m_taskCompletionNotifier->wait();
             }
