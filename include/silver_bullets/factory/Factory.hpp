@@ -1,7 +1,7 @@
 #pragma once
 
 /// \file
-/// \brief ctm::Factory and ctm::FactoryMixin template classes, plus related classes and macros.
+/// \brief silver_bullets::Factory and silver_bullets::FactoryMixin template classes, plus related classes and macros.
 
 #include <string>
 #include <memory>
@@ -236,18 +236,18 @@ public:
 
 /// \brief Registers a type in a factory.
 /// \param Class Implementation of factory interface to be registered.
-/// Must inherit ctm::FactoryMixin.
+/// Must inherit silver_bullets::FactoryMixin.
 /// \param typeId Type identifier to be associated with \a Class.
-/// \note This macro declares a static variable of type ctm::FactoryMixin::Registrator, which
+/// \note This macro declares a static variable of type silver_bullets::FactoryMixin::Registrator, which
 /// leads to the registration of \a Class in the appropriate factory.
-/// \sa ctm::Factory.
+/// \sa silver_bullets::Factory.
 #define SILVER_BULLETS_FACTORY_REGISTER_TYPE( Class, typeId ) \
     static Class::Registrator Class##Registrator( typeId );
 
-/// \brief Defines a specialization of ctm::ImplementationTypeTraits.
+/// \brief Defines a specialization of silver_bullets::ImplementationTypeTraits.
 /// \param Implementation A class derived from FactoryMixin.
 /// \param typeName Type identifier to be associated with \a Implementation.
-/// \sa ctm::Factory, ctm::ImplementationTypeTraits.
+/// \sa silver_bullets::Factory, silver_bullets::ImplementationTypeTraits.
 #define SILVER_BULLETS_DECL_IMPLEMENTATION_TRAITS( Implementation, typeName ) \
     template<> \
     struct ImplementationTypeTraits< Implementation > { \
@@ -255,10 +255,10 @@ public:
     };
 
 /// \def SILVER_BULLETS_DECL_IMPLEMENTATION_TEMPLATE_TRAITS( Implementation, typeName )
-/// \brief Defines a specialization of ctm::ImplementationTypeTraits for a template implementation of a template interface.
-/// \param Implementation A template class derived from ctm::FactoryMixin.
+/// \brief Defines a specialization of silver_bullets::ImplementationTypeTraits for a template implementation of a template interface.
+/// \param Implementation A template class derived from silver_bullets::FactoryMixin.
 /// \param typeName Type identifier to be associated with \a Implementation.
-/// \sa ctm::Factory, ctm::ImplementationTypeTraits, #SILVER_BULLETS_DECL_IMPLEMENTATION_TEMPLATE_TRAITS.
+/// \sa silver_bullets::Factory, silver_bullets::ImplementationTypeTraits, #SILVER_BULLETS_DECL_IMPLEMENTATION_TEMPLATE_TRAITS.
 #if defined (__GNUC__) && (__GNUC__ < 8)
 #define SILVER_BULLETS_DECL_IMPLEMENTATION_TEMPLATE_TRAITS( Implementation, typeName ) \
     template<> \
@@ -275,12 +275,12 @@ public:
 #endif // defined (__GNUC__) && (__GNUC__ < 8)
 
 
-/// \brief Declares a variable of type ctm::ImplementationRegistrator.
-/// \param Implementation A class derived from ctm::FactoryMixin.
+/// \brief Declares a variable of type silver_bullets::ImplementationRegistrator.
+/// \param Implementation A class derived from silver_bullets::FactoryMixin.
 /// \note In particular, this macro can be used to declare fields of a class.
-/// \note Make sure to provide the appropriate ctm::ImplementationTypeTraits specialization before
+/// \note Make sure to provide the appropriate silver_bullets::ImplementationTypeTraits specialization before
 /// using this macro. To do so, use the #SILVER_BULLETS_DECL_IMPLEMENTATION_TRAITS macro.
-/// \sa ctm::Factory, ctm::ImplementationTypeTraits, #SILVER_BULLETS_DECL_IMPLEMENTATION_TEMPLATE_REGISTRATOR.
+/// \sa silver_bullets::Factory, silver_bullets::ImplementationTypeTraits, #SILVER_BULLETS_DECL_IMPLEMENTATION_TEMPLATE_REGISTRATOR.
 #define SILVER_BULLETS_DECL_IMPLEMENTATION_REGISTRATOR( Implementation ) \
     ImplementationRegistrator< Implementation > Implementation##Registrator;
 
@@ -290,6 +290,6 @@ public:
 /// \note In particular, this macro can be used to declare fields of a class.
 /// \note Make sure to provide the appropriate ImplementationTypeTraits specialization before
 /// using this macro. To do so, use the #SILVER_BULLETS_DECL_IMPLEMENTATION_TEMPLATE_TRAITS macro.
-/// \sa ctm::Factory, ctm::ImplementationTypeTraits, #SILVER_BULLETS_DECL_IMPLEMENTATION_REGISTRATOR.
+/// \sa silver_bullets::Factory, silver_bullets::ImplementationTypeTraits, #SILVER_BULLETS_DECL_IMPLEMENTATION_REGISTRATOR.
 #define SILVER_BULLETS_DECL_IMPLEMENTATION_TEMPLATE_REGISTRATOR( Implementation, ... ) \
     ImplementationRegistrator< Implementation<__VA_ARGS__> > Implementation##Registrator;
