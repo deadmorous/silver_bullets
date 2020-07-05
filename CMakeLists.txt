@@ -7,6 +7,7 @@ set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 set (BUILD_SHARED_LIBS true)
 
 set (SILVER_BULLETS_ROOT_DIR ${CMAKE_CURRENT_LIST_DIR})
+set (SILVER_BULLETS_INCLUDE_DIR ${SILVER_BULLETS_ROOT_DIR}/include/silver_bullets)
 
 find_package(Boost)
 
@@ -18,4 +19,3 @@ add_subdirectory(src)
 add_subdirectory(examples)
 
 install(DIRECTORY ${SILVER_BULLETS_ROOT_DIR}/external/rapidjson/include/rapidjson DESTINATION include)
-
