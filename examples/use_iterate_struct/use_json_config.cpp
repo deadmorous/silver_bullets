@@ -2,40 +2,40 @@
 
 #include "use_json_config.hpp"
 
-#include "iterate_struct/ConfigLoader.hpp"
-#include "iterate_struct/reportParameterOrigin.h"
+#include "silver_bullets/iterate_struct/ConfigLoader.hpp"
+#include "silver_bullets/iterate_struct/reportParameterOrigin.h"
 
-#include "templatize/resolve_template_args.hpp"
+#include "silver_bullets/templatize/resolve_template_args.hpp"
 
 #include <iostream>
 #include <boost/program_options.hpp>
 
 using namespace std;
-using namespace iterate_struct;
+using namespace silver_bullets::iterate_struct;
 
 enum class ParamType { One, Two, Vector };
 
-CTM_BEGIN_DEFINE_ENUM_NAMES(ParamType)
+SILVER_BULLETS_BEGIN_DEFINE_ENUM_NAMES(ParamType)
     { ParamType::One, "one" },
     { ParamType::Two, "two" },
     { ParamType::Vector, "vector" }
-CTM_END_DEFINE_ENUM_NAMES()
+SILVER_BULLETS_END_DEFINE_ENUM_NAMES()
 
 struct OneParam {
     int p = 0;
 };
-DESCRIBE_STRUCTURE_FIELDS(OneParam, p);
+SILVER_BULLETS_DESCRIBE_STRUCTURE_FIELDS(OneParam, p);
 
 struct TwoParam {
     int p1 = 1;
     int p2 = 2;
 };
-DESCRIBE_STRUCTURE_FIELDS(TwoParam, p1, p2);
+SILVER_BULLETS_DESCRIBE_STRUCTURE_FIELDS(TwoParam, p1, p2);
 
 struct VectorParam {
     vector<int> p;
 };
-DESCRIBE_STRUCTURE_FIELDS(VectorParam, p);
+SILVER_BULLETS_DESCRIBE_STRUCTURE_FIELDS(VectorParam, p);
 
 template <ParamType paramType> struct ParamDispatch;
 template <ParamType paramType> using ParamDispatch_t = typename ParamDispatch<paramType>::type;
@@ -49,7 +49,7 @@ struct Foo
     ParamType type = paramType;
     ParamDispatch_t<paramType> parameters;
 };
-DESCRIBE_TEMPLATE_STRUCTURE_FIELDS(((ParamType, ParamType)), Foo, type, parameters)
+SILVER_BULLETS_DESCRIBE_TEMPLATE_STRUCTURE_FIELDS(((ParamType, ParamType)), Foo, type, parameters)
 
 template <ParamType paramType>
 void useConfig(const ConfigLoader& configLoader)
@@ -116,7 +116,7 @@ void use_json_config(int argc, char *argv[])
                 cl.setOptionalString(cmdLineOptions.type, "/type", origin);
         });
         auto paramType = configLoader.valueAt<ParamType>("/type", ParamType::Two);
-        resolve_template_args<
+        silver_bullets::resolve_template_args<
                 integer_sequence<ParamType, ParamType::One, ParamType::Two, ParamType::Vector>>
                 (make_tuple(paramType), useConfigCaller(), configLoader);
     }

@@ -1,9 +1,9 @@
 // PerTypeStorage.cpp
 
-#include "factory/PerTypeStorage.hpp"
+#include "silver_bullets/factory/PerTypeStorage.hpp"
 
-namespace ctm {
+namespace silver_bullets {
 
-FACTORY_API PerTypeStorage::Data *PerTypeStorage::m_data = nullptr;
+SILVER_BULLETS_FACTORY_API PerTypeStorage::Data *PerTypeStorage::m_data = nullptr;
 
-} // end namespace ctm
+} // end namespace silver_bullets

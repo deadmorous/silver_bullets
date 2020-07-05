@@ -1,12 +1,14 @@
 #include <iostream>
 
-#include "trie/Trie.hpp"
+#include "silver_bullets/trie.hpp"
 
 using namespace std;
 
 int main(int argc, char **argv)
 {
     try {
+        using namespace silver_bullets;
+
         Trie<AsciiCharAlphabet, size_t> t;
         t.add("foo");
         t.add("bar");

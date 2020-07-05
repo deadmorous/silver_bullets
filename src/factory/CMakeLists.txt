@@ -4,19 +4,20 @@ get_filename_component(ProjectId ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 project(${ProjectId})
 
 file(GLOB HEADER_FILES
-    ${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/*.hpp
-    ${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/*.h
+    ${SILVER_BULLETS_ROOT_DIR}/include/${PROJECT_NAME}.hpp
+    ${SILVER_BULLETS_ROOT_DIR}/include/${PROJECT_NAME}/*.hpp
+    ${SILVER_BULLETS_ROOT_DIR}/include/${PROJECT_NAME}/*.h
 )
 
 aux_source_directory(. SOURCE_FILES)
-add_library(${PROJECT_NAME} ${SOURCE_FILES} ${HEADER_FILES})
+add_library(sb_${PROJECT_NAME} ${SOURCE_FILES} ${HEADER_FILES})
 
-set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY
+set_property(TARGET sb_${PROJECT_NAME} APPEND PROPERTY
   COMPILE_DEFINITIONS $<$<CONFIG:Debug>:_DEBUG>
 )
 
 
-install(TARGETS ${PROJECT_NAME} DESTINATION lib)
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/../../include/${PROJECT_NAME} DESTINATION include)
-install(FILES ${PROJECT_SOURCE_DIR}/../../cmake/FindFactory.cmake DESTINATION cmake)
+install(TARGETS sb_${PROJECT_NAME} DESTINATION lib)
+install(FILES ${HEADER_FILES} DESTINATION include/silver_bullets)
+install(FILES ./FindSilverBulletsFactory.cmake DESTINATION cmake)
 

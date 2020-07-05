@@ -1,7 +1,7 @@
 #include <iostream>
 #include <utility>
 
-#include "templatize/resolve_template_args.hpp"
+#include "silver_bullets/templatize/resolve_template_args.hpp"
 
 
 using namespace std;
@@ -43,6 +43,8 @@ struct callFt3 {
 
 void f(int i, E e, int j, double x)
 {
+    using namespace silver_bullets;
+
     resolve_template_args<
             integer_sequence<int, 1,2,3>>(
                 make_tuple(i), callFt1(), x);

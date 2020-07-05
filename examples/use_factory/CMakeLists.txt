@@ -5,8 +5,8 @@ project(${ProjectId})
 
 aux_source_directory(${PROJECT_SOURCE_DIR} SOURCE_FILES)
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-add_dependencies(${PROJECT_NAME} factory)
-target_link_libraries(${PROJECT_NAME} factory)
+add_dependencies(${PROJECT_NAME} sb_factory)
+target_link_libraries(${PROJECT_NAME} sb_factory)
 
 set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY
   COMPILE_DEFINITIONS $<$<CONFIG:Debug>:_DEBUG>

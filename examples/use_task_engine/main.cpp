@@ -1,9 +1,10 @@
-#include "task_engine/task_engine.hpp"
+#include "silver_bullets/task_engine/task_engine.hpp"
 
 #include <iostream>
 
 using namespace std;
-using namespace silver_bullets::task_engine;
+using namespace silver_bullets;
+using namespace task_engine;
 
 // Computes the following graph (each node computes the sum of its two input).
 //
@@ -263,7 +264,7 @@ void test_03()
 //         +-----+
 //            |
 //            15
-void test_04(const CancelController::Checker& isCancelled)
+void test_04(const sync::CancelController::Checker& isCancelled)
 {
     // TODO: use cancel
     using TaskFunc = StatefulCancellableTaskFunc;
@@ -274,7 +275,7 @@ void test_04(const CancelController::Checker& isCancelled)
         void call(
                     const pany_range& out,
                     const const_pany_range& in,
-                    const CancelController::Checker& isCancelled) const override
+                    const sync::CancelController::Checker& isCancelled) const override
         {
             // Wait for 300 ms, but check if the computation is cancelled each 10 ms.
             for (auto x=0; x<30; ++x) {
@@ -346,7 +347,7 @@ int main()
 {
     TaskQueueFuncRegistry funcRegistry;
 
-    funcRegistry[0] = [](boost::any& threadLocalState, const CancelController::Checker&)
+    funcRegistry[0] = [](boost::any& threadLocalState, const sync::CancelController::Checker&)
     {
         cout << "********** SETTING THREAD LOCAL STATE TO 42 **********" << endl;
         threadLocalState = 42;
@@ -355,21 +356,21 @@ int main()
         cout << "********** FINISHED test_01 **********" << endl << endl;
     };
 
-    funcRegistry[1] = [](boost::any&, const CancelController::Checker&)
+    funcRegistry[1] = [](boost::any&, const sync::CancelController::Checker&)
     {
         cout << "********** STARTING test_02 **********" << endl;
         test_02();
         cout << "********** FINISHED test_02 **********" << endl << endl;
     };
 
-    funcRegistry[2] = [](boost::any&, const CancelController::Checker&)
+    funcRegistry[2] = [](boost::any&, const sync::CancelController::Checker&)
     {
         cout << "********** STARTING test_03 **********" << endl;
         test_03();
         cout << "********** FINISHED test_03 **********" << endl << endl;
     };
 
-    funcRegistry[3] = [](boost::any& threadLocalState, const CancelController::Checker& isCancelled)
+    funcRegistry[3] = [](boost::any& threadLocalState, const sync::CancelController::Checker& isCancelled)
     {
         cout << "********** READING THREAD LOCAL STATE: "
              << boost::any_cast<int>(threadLocalState) << " **********" << endl;
@@ -378,7 +379,7 @@ int main()
         cout << "********** FINISHED test_04 **********" << endl << endl;
     };
 
-    CancelController cc;
+    sync::CancelController cc;
 
     TaskQueueExecutor x(cc.checker());
     x.setTaskFuncRegistry(&funcRegistry);

@@ -1,12 +1,10 @@
-#include "use_iterate_struct.hpp"
-
-#include "iterate_struct/iterate_struct.hpp"
-#include "iterate_struct/value_printer.hpp"
-#include "iterate_struct/ptree_converter.hpp"
-#include "iterate_struct/json_doc_converter.hpp"
-#include "iterate_struct/json_doc_io.hpp"
-#include "iterate_struct/collect_paths_struct.hpp"
-#include "iterate_struct/collect_paths_json_doc.hpp"
+#include "silver_bullets/iterate_struct/iterate_struct.hpp"
+#include "silver_bullets/iterate_struct/value_printer.hpp"
+#include "silver_bullets/iterate_struct/ptree_converter.hpp"
+#include "silver_bullets/iterate_struct/json_doc_converter.hpp"
+#include "silver_bullets/iterate_struct/json_doc_io.hpp"
+#include "silver_bullets/iterate_struct/collect_paths_struct.hpp"
+#include "silver_bullets/iterate_struct/collect_paths_json_doc.hpp"
 
 #include <boost/property_tree/json_parser.hpp>
 #include <rapidjson/pointer.h>
@@ -49,13 +47,13 @@ struct WP2
 
 } // namespace my
 
-DESCRIBE_STRUCTURE_FIELDS(my::Foo, bar, s, d)
-DESCRIBE_STRUCTURE_FIELDS(my::Bar, x, foo)
+SILVER_BULLETS_DESCRIBE_STRUCTURE_FIELDS(my::Foo, bar, s, d)
+SILVER_BULLETS_DESCRIBE_STRUCTURE_FIELDS(my::Bar, x, foo)
 
 // Not working due to unresolvable template parameters
-// DESCRIBE_TEMPLATE_STRUCTURE_FIELDS(((class, T), (int, i)), WP, x)
+// SILVER_BULLETS_DESCRIBE_TEMPLATE_STRUCTURE_FIELDS(((class, T), (int, i)), WP, x)
 
-DESCRIBE_TEMPLATE_STRUCTURE_FIELDS(((class, T), (int, i)), my::WP2, x)
+SILVER_BULLETS_DESCRIBE_TEMPLATE_STRUCTURE_FIELDS(((class, T), (int, i)), my::WP2, x)
 
 
 
@@ -70,7 +68,7 @@ struct Containers
     map<int, int> map_int_int;
 };
 
-DESCRIBE_STRUCTURE_FIELDS(
+SILVER_BULLETS_DESCRIBE_STRUCTURE_FIELDS(
         Containers
         , v_str
         , pair_int_str
@@ -81,6 +79,7 @@ DESCRIBE_STRUCTURE_FIELDS(
 
 
 using namespace std;
+using namespace silver_bullets;
 
 void use_iterate_struct()
 {
@@ -119,7 +118,7 @@ void use_iterate_struct()
     auto v = p->GetArray();
     rapidjson::SetValueByPointer(jsdoc, "/a/s/d", 123);
 
-    write_json_doc(cout, jsdoc);
+    iterate_struct::write_json_doc(cout, jsdoc);
     cout << endl;
 
     cout << "Bar read from JSON: using rapidjson" << endl;

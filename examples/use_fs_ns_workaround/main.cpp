@@ -1,7 +1,7 @@
 #include <iostream>
 #include <iomanip>
 
-#include "fs_ns_workaround/fs_ns_workaround.hpp"
+#include "silver_bullets/fs_ns_workaround.hpp"
 
 using namespace std;
 

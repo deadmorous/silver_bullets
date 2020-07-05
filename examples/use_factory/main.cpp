@@ -1,4 +1,4 @@
-#include "factory/Factory.hpp"
+#include "silver_bullets/factory.hpp"
 
 #include <iostream>
 
@@ -12,7 +12,7 @@ public:
 };
 
 class A : public Interface,
-        public ctm::FactoryMixin<A, Interface>
+        public silver_bullets::FactoryMixin<A, Interface>
 {
 public:
     A() {
@@ -27,7 +27,7 @@ public:
 };
 
 class B : public Interface,
-        public ctm::FactoryMixin<B, Interface>
+        public silver_bullets::FactoryMixin<B, Interface>
 {
 public:
     B() {
@@ -41,16 +41,16 @@ public:
     }
 };
 
-CTM_FACTORY_REGISTER_TYPE(A, "A");
-CTM_FACTORY_REGISTER_TYPE(B, "B");
+SILVER_BULLETS_FACTORY_REGISTER_TYPE(A, "A");
+SILVER_BULLETS_FACTORY_REGISTER_TYPE(B, "B");
 
 
 int main()
 {
     try {
-        auto x = ctm::Factory<Interface>::newInstance("A");
+        auto x = silver_bullets::Factory<Interface>::newInstance("A");
         x->hello();
-        x = ctm::Factory<Interface>::newInstance("B");
+        x = silver_bullets::Factory<Interface>::newInstance("B");
         x->hello();
         return EXIT_SUCCESS;
     }
