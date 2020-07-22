@@ -1,4 +1,4 @@
-#include "silver_bullets/task_engine/task_engine.hpp"
+#include "silver_bullets/task_engine.hpp"
 
 #include "silver_bullets/task_engine/ParallelTaskScheduler.hpp"
 
