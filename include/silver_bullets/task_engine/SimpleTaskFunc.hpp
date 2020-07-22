@@ -37,10 +37,20 @@ struct ToAnyPtrRange
 
 } // namespace detail
 
-template<class F> inline SimpleTaskFunc makeSimpleTaskFunc(F f)
+template<class F> inline SimpleTaskFunc makeSimpleTaskFunc(
+        F f,
+        std::enable_if_t<!std::is_void_v<typename function_traits<F>::return_type>, int> = 0)
 {
     return func_arg_convert<const pany_range&, const const_pany_range&>(
                 f, detail::ToAnyPtrRange(), detail::FromAnyPtr());
+}
+
+template<class F> inline SimpleTaskFunc makeSimpleTaskFunc(
+        F f,
+        std::enable_if_t<std::is_void_v<typename function_traits<F>::return_type>, int> = 0)
+{
+    return func_arg_convert<const pany_range&, const const_pany_range&>(
+                f, detail::FromAnyPtr());
 }
 
 

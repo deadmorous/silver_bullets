@@ -165,7 +165,7 @@ private:
     struct ResourceInfo
     {
         std::vector<ExecutorInfo> executorInfo;
-        std::size_t runningExecutorCount = 0;   // Running are all at the beginning of executors
+        std::size_t runningExecutorCount = 0;   // Running are all at the beginning of executorInfo
     };
 
     TaskExecutorCancelParam_t<TaskFunc> m_cancelParam;

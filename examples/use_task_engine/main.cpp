@@ -1,5 +1,7 @@
 #include "silver_bullets/task_engine/task_engine.hpp"
 
+#include "silver_bullets/task_engine/ParallelTaskScheduler.hpp"
+
 #include <iostream>
 
 using namespace std;
@@ -343,6 +345,69 @@ void test_04(const sync::CancelController::Checker& isCancelled)
     reportTimeElapsed();
 }
 
+void testParallelScheduler()
+{
+    using TaskFunc = SimpleTaskFunc;
+
+    using TFR = TaskFuncRegistry<TaskFunc>;
+    using TTX = ThreadedTaskExecutor<TaskFunc>;
+    using PTS = ParallelTaskScheduler<TaskFunc>;
+
+    mutex coutMutex;
+
+    auto taskFunc = makeSimpleTaskFunc([&coutMutex](int taskId) {
+        {
+            lock_guard g(coutMutex);
+            cout << "Task " << taskId << " - starting" << endl;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        {
+            lock_guard g(coutMutex);
+            cout << "Task " << taskId << " - finishing" << endl;
+        }
+    });
+
+    auto taskFuncId = 1;
+    TFR taskFuncRegistry;
+    taskFuncRegistry[taskFuncId] = taskFunc;
+
+    auto resType = 333;
+
+    PTS pts;
+    constexpr auto TxCount = 5;
+    for (auto i=0; i<TxCount; ++i)
+        pts.addTaskExecutor(std::make_shared<TTX>(resType, &taskFuncRegistry));
+
+    constexpr auto TaskCount = 20;
+    vector<boost::any> inputs(TaskCount);
+    vector<boost::any*> pinputs(TaskCount);
+    for (int iinput=0; iinput<TaskCount; ++iinput) {
+        inputs[iinput] = iinput;    // Task id
+        pinputs[iinput] = &inputs[iinput];
+    }
+
+    using namespace std::chrono;
+    auto startTime = system_clock::now();
+
+    auto reportTimeElapsed = [&startTime]() {
+        auto endTime = system_clock::now();
+        auto duration = endTime - startTime;
+        cout << "Time elapsed: " << duration_cast<milliseconds>(duration).count() << " ms" << endl;
+    };
+
+    for (size_t iinput=0; iinput<TaskCount; ++iinput) {
+        pts.addTask({
+            {1, 0, taskFuncId, resType},
+            pany_range(),
+            const_pany_range(pinputs.data()+iinput, pinputs.data()+iinput+1),
+            std::function<void()>()
+        });
+    }
+
+    pts.wait();
+    reportTimeElapsed();
+}
+
 int main()
 {
     TaskQueueFuncRegistry funcRegistry;
@@ -391,6 +456,10 @@ int main()
     x.post(3);
     this_thread::sleep_for(chrono::milliseconds(100));
     cc.cancel();
+
+    cout << "********** STARTING testParallelScheduler **********" << endl;
+    testParallelScheduler();
+    cout << "********** FINISHED test_04 **********" << endl << endl;
 
     return 0;
 }

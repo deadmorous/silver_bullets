@@ -31,13 +31,32 @@ template<
 inline auto func_arg_convert(
         F f,
         const ReturnValConverter& returnValConverter,
-        const ArgConverter& argConverter)
+        const ArgConverter& argConverter,
+        std::enable_if_t<!std::is_void_v<typename function_traits<F>::return_type>, int> = 0)
 {
     return [f, argConverter, returnValConverter](OutputType out, InputRange in) {
         using FT = function_traits<F>;
         using args_type = typename FT::args_type;
         using iargs_type = indexed_tuple_t<args_type>;
         returnValConverter(out, func::detail::FuncArgConvertCaller<iargs_type>::convertAndCall(f, in, argConverter));
+    };
+}
+
+template<
+        class OutputType,
+        class InputRange,
+        class F,
+        class ArgConverter>
+inline auto func_arg_convert(
+        F f,
+        const ArgConverter& argConverter,
+        std::enable_if_t<std::is_void_v<typename function_traits<F>::return_type>, int> = 0)
+{
+    return [f, argConverter](OutputType, InputRange in) {
+        using FT = function_traits<F>;
+        using args_type = typename FT::args_type;
+        using iargs_type = indexed_tuple_t<args_type>;
+        func::detail::FuncArgConvertCaller<iargs_type>::convertAndCall(f, in, argConverter);
     };
 }
 

@@ -15,6 +15,10 @@ template<class T, std::size_t i> struct Indexed {
 
 template <std::size_t N, class ... T> struct OffsetIndexedTuple;
 
+template<std::size_t N> struct OffsetIndexedTuple<N> {
+    using type = std::tuple<>;
+};
+
 template<std::size_t N, class T> struct OffsetIndexedTuple<N, T> {
     using type = std::tuple<Indexed<T, N>>;
 };
