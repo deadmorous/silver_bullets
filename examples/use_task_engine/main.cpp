@@ -55,7 +55,7 @@ void test_01()
         x.addTaskExecutor(std::make_shared<TTX>(resType, &taskFuncRegistry));
 
     auto cache = x.makeCache();
-    x.start(&g, cache).join();
+    x.start(&g, cache).wait();
 
     cout << boost::any_cast<int>(g.output(task2, 0)) << endl;
 }
@@ -137,7 +137,7 @@ void test_02()
     if (syncMode) {
         // Call computation synchronously
         x.start(&g, cache);
-        x.join();
+        x.wait();
     }
     else {
         // In the asynchronous mode, we specify a callback;
@@ -244,7 +244,7 @@ void test_03()
 
     auto g = b.taskGraph();
     auto cache = x.makeCache();
-    x.start(&g, cache).join();
+    x.start(&g, cache).wait();
 
     cout << boost::any_cast<int>(g.output(t51, 0)) << endl;
 }
@@ -335,7 +335,7 @@ void test_04(const sync::CancelController::Checker& isCancelled)
         cout << "Time elapsed: " << duration_cast<milliseconds>(duration).count() << " ms" << endl;
     };
 
-    x.join();
+    x.wait();
 
     if (isCancelled)
         cout << "cancelled" << endl;

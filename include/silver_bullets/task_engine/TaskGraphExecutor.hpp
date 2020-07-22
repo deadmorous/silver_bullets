@@ -61,7 +61,7 @@ public:
         return m_running;
     }
 
-    TaskGraphExecutor& join()
+    TaskGraphExecutor& wait()
     {
         while(m_running) {
             m_taskCompletionNotifier.wait();
@@ -71,7 +71,7 @@ public:
     }
 
     template< class Rep, class Period >
-    bool maybeJoin(const std::chrono::duration<Rep, Period>& timeout)
+    bool maybeWait(const std::chrono::duration<Rep, Period>& timeout)
     {
         auto endTime = std::chrono::system_clock::now() + timeout;
         auto remainingTimeout = timeout;
