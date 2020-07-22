@@ -28,11 +28,12 @@ public:
         return *this;
     }
 
-    size_t addTask(const TaskExecutorStartParam& startParam)
+    ParallelTaskScheduler& addTask(const TaskExecutorStartParam& startParam)
     {
         auto& ri = m_resourceInfo.at(startParam.task.resourceType);
         ri.tasks.push_back(startParam);
         maybeStartNextTask(startParam.task.resourceType);
+        return *this;
     }
 
     bool isRunning() const {
