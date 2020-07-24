@@ -8,6 +8,7 @@ set (BUILD_SHARED_LIBS true)
 
 set (SILVER_BULLETS_ROOT_DIR ${CMAKE_CURRENT_LIST_DIR})
 set (SILVER_BULLETS_INCLUDE_DIR ${SILVER_BULLETS_ROOT_DIR}/include/silver_bullets)
+option (BUILD_REMOTE_EXECUTOR OFF)
 
 find_package(Boost)
 

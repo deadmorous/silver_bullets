@@ -1,0 +1,4 @@
+cmake_minimum_required(VERSION 3.5)
+
+add_subdirectory(use_remote_task_engine_main)
+add_subdirectory(use_remote_task_engine_worker)
