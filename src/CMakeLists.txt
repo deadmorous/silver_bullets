@@ -11,3 +11,7 @@ add_subdirectory(sync)
 add_subdirectory(task_engine)
 add_subdirectory(func)
 
+install(FILES
+    ${SILVER_BULLETS_INCLUDE_DIR}/import_export.hpp
+    ${SILVER_BULLETS_INCLUDE_DIR}/lib_warmup.hpp
+    DESTINATION include/silver_bullets/)
