@@ -10,21 +10,28 @@ class ThreadNotifier
 {
 public:
     void notify_one() {
-        m_ready = true;
+        {
+            std::unique_lock<std::mutex> lock(m_mutex);
+            m_ready = true;
+        }
         m_cond.notify_one();
     }
 
     void notify_all() {
-        m_ready = true;
+        {
+            std::unique_lock<std::mutex> lock(m_mutex);
+            m_ready = true;
+        }
         m_cond.notify_all();
     }
 
     void wait()
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        m_cond.wait(lock, [this] {
-            return m_ready;
-        });
+        if (!m_ready)
+            m_cond.wait(lock, [this] {
+                return m_ready;
+            });
         m_ready = false;
     }
 
