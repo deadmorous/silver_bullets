@@ -190,10 +190,10 @@ void test_03()
     // Outputs the sum of the local state and all inputs
     class ComputeFunc : public StatefulTaskFuncInterface {
     public:
-        void call(const pany_range& out, const const_pany_range& in) const override
+        void call(boost::any& threadLocalData, const pany_range& out, const const_pany_range& in) const override
         {
             auto result =
-                    boost::any_cast<int>(*threadLocalData()) +
+                    boost::any_cast<int>(threadLocalData) +
                     boost::any_cast<int>(*readOnlySharedData());
 
             for (auto& item : in)
@@ -275,6 +275,7 @@ void test_04(const sync::CancelController::Checker& isCancelled)
     class ComputeFunc : public StatefulCancellableTaskFuncInterface {
     public:
         void call(
+                    boost::any& threadLocalData,
                     const pany_range& out,
                     const const_pany_range& in,
                     const sync::CancelController::Checker& isCancelled) const override
@@ -286,7 +287,7 @@ void test_04(const sync::CancelController::Checker& isCancelled)
                     return;
             }
             auto result =
-                    boost::any_cast<int>(*threadLocalData()) +
+                    boost::any_cast<int>(threadLocalData) +
                     boost::any_cast<int>(*readOnlySharedData());
             for (auto& item : in)
                 result += boost::any_cast<int>(*item);

@@ -12,15 +12,10 @@ namespace task_engine {
 class StatefulTaskFuncInterface
 {
 public:
-    virtual void call(const pany_range& out, const const_pany_range& in) const = 0;
-
-    void setThreadLocalData(boost::any *threadLocalData) {
-        m_threadLocalData = threadLocalData;
-    }
-
-    boost::any *threadLocalData() const {
-        return m_threadLocalData;
-    }
+    virtual void call(
+            boost::any& threadLocalData,
+            const pany_range& out,
+            const const_pany_range& in) const = 0;
 
     void setReadOnlySharedData(const boost::any *readOnlySharedData) {
         m_readOnlySharedData = readOnlySharedData;
@@ -31,7 +26,6 @@ public:
     }
 
 private:
-    boost::any *m_threadLocalData = nullptr;
     const boost::any *m_readOnlySharedData = nullptr;
 };
 
@@ -72,9 +66,8 @@ inline void callTaskFunc<StatefulTaskFunc>(
         const ReadOnlySharedData_t<StatefulTaskFunc>* readOnlySharedData)
 {
     auto fp = f.get();
-    fp->setThreadLocalData(threadLocalData);
     fp->setReadOnlySharedData(readOnlySharedData);
-    fp->call(outputs, inputs);
+    fp->call(*threadLocalData, outputs, inputs);
 }
 
 } // namespace task_engine

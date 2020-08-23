@@ -14,17 +14,10 @@ class StatefulCancellableTaskFuncInterface
 {
 public:
     virtual void call(
+            boost::any& threadLocalData,
             const pany_range& out,
             const const_pany_range& in,
             const sync::CancelController::Checker& isCancelled) const = 0;
-
-    void setThreadLocalData(boost::any *threadLocalData) {
-        m_threadLocalData = threadLocalData;
-    }
-
-    boost::any *threadLocalData() const {
-        return m_threadLocalData;
-    }
 
     void setReadOnlySharedData(const boost::any *readOnlySharedData) {
         m_readOnlySharedData = readOnlySharedData;
@@ -35,7 +28,6 @@ public:
     }
 
 private:
-    boost::any *m_threadLocalData = nullptr;
     const boost::any *m_readOnlySharedData = nullptr;
 };
 
@@ -78,9 +70,8 @@ inline void callTaskFunc<StatefulCancellableTaskFunc>(
         const ReadOnlySharedData_t<StatefulCancellableTaskFunc>* readOnlySharedData)
 {
     auto fp = f.get();
-    fp->setThreadLocalData(threadLocalData);
     fp->setReadOnlySharedData(readOnlySharedData);
-    fp->call(outputs, inputs, cancelParam);
+    fp->call(*threadLocalData, outputs, inputs, cancelParam);
 }
 
 } // namespace task_engine
