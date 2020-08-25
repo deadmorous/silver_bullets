@@ -1,6 +1,8 @@
 #pragma once
 
 #include "iterate_struct.hpp"
+#include "JsonValue_fwd.hpp"
+
 #include <ostream>
 
 #include "silver_bullets/enum_names.hpp"
@@ -156,6 +158,15 @@ private:
             m_cb(current_path());
         m_s << std::endl;
         return false;
+    }
+
+    bool print_priv(const JsonValue& x, bool needPad) const
+    {
+        maybePad(needPad);
+        m_s << x.asString();    // TODO better: expand JSON value
+        if (m_cb)
+            m_cb(current_path());
+        return true;
     }
 
     void maybePad(bool needPad) const

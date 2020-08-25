@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include "iterate_struct.hpp"
+#include "JsonValue_fwd.hpp"
 
 #include <rapidjson/document.h>
 #include <list>
@@ -103,6 +104,10 @@ private:
                         generate_priv(item.second),
                         m_allocator);
         return result;
+    }
+
+    rapidjson::Document generate_priv(const JsonValue& x) const {
+        return x.toRapidjsonDocument();
     }
 
     rapidjson::Document::AllocatorType& m_allocator;
@@ -252,6 +257,11 @@ private:
             result[boost::lexical_cast<typename T::key_type>(member.name.GetString())] =
                     parse_priv<typename T::mapped_type>(member.value);
         return result;
+    }
+
+    template <class T, std::enable_if_t<std::is_same_v<T, JsonValue>, int> = 0>
+    T parse_priv(const rapidjson::Value& node) const {
+        return T(node);
     }
 
     mutable std::vector<const rapidjson::Value*> m_nodes;

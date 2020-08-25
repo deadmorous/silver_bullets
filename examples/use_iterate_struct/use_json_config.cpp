@@ -29,8 +29,9 @@ SILVER_BULLETS_DESCRIBE_STRUCTURE_FIELDS(OneParam, p);
 struct TwoParam {
     int p1 = 1;
     int p2 = 2;
+    JsonValue json;
 };
-SILVER_BULLETS_DESCRIBE_STRUCTURE_FIELDS(TwoParam, p1, p2);
+SILVER_BULLETS_DESCRIBE_STRUCTURE_FIELDS(TwoParam, p1, p2, json);
 
 struct VectorParam {
     vector<int> p;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "iterate_struct.hpp"
+#include "JsonValue_fwd.hpp"
 
 #include <vector>
 #include <boost/lexical_cast.hpp>
@@ -47,7 +48,8 @@ private:
     }
 
     template <class T, std::enable_if_t<iterate_struct::has_iterate_struct_helper_v<T>, int> = 0>
-    void collect_priv(const T& x) const {
+    void collect_priv(const T& x) const
+    {
         if (!m_leavesOnly)
             m_paths.push_back(current_path());
         for_each(x, *this);
@@ -88,6 +90,10 @@ private:
             collect_priv(item.second);
             m_current_path_items.pop_back();
         }
+    }
+
+    void collect_priv(const JsonValue& x) const {
+        m_paths.push_back(current_path());  // TODO better: expand JSON value
     }
 
     std::string current_path() const {
