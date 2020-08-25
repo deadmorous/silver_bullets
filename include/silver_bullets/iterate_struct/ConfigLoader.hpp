@@ -7,6 +7,7 @@
 #include "json_doc_converter.hpp"
 #include "json_doc_io.hpp"
 #include "value_printer.hpp"
+#include "JsonValue.hpp"
 
 #include "silver_bullets/fs_ns_workaround.hpp"
 
@@ -22,7 +23,9 @@ public:
     static std::string findConfigFile(const std::string& name)
     {
         using namespace std::filesystem;
-        if (exists(name))
+        if (name.empty())
+            return std::string();
+        else if (exists(name))
             return current_path() / name;
         else {
             auto searchConfig = [&] (const char *env) {
