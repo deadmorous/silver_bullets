@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package silver_bullets.task_engine;
+
+// The greeter service definition.
+service Executor {
+
+  rpc Run (RunParam) returns (RunReply) {}
+  rpc Cancel (CancelParam) returns (CancelReply) {}
+}
+
+message RemoteTask {
+  int32 inputCount = 1;
+  int32 outputCount = 2;
+  int32 taskFuncId = 3;
+  int32 resourceType = 4;
+}
+
+message RunParam {
+  RemoteTask task = 1;
+  repeated bytes inputs = 2;
+}
+
+message RunReply {
+  int32 status = 1;
+  repeated bytes outputs = 2;
+}
+
+message CancelParam {
+  int32 status = 1;
+}
+
+message CancelReply {
+  int32 status = 1;
+}

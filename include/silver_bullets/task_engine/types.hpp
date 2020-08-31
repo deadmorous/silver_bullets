@@ -5,6 +5,9 @@
 
 #include <type_traits>
 
+#include <map>
+#include <functional>
+
 namespace silver_bullets {
 namespace task_engine {
 
@@ -16,6 +19,7 @@ template<class TaskFunc> using ThreadLocalData_t = typename ThreadLocalData<Task
 template<class TaskFunc> struct ReadOnlySharedData;
 template<class TaskFunc> using ReadOnlySharedData_t = typename ReadOnlySharedData<TaskFunc>::type;
 template<class TaskFunc> class ThreadedTaskExecutorInit;
+template<class TaskFunc> class RemoteTaskExecutorInit;
 template<class TaskFunc> struct IsCancellable;
 
 template<class TaskFunc>
@@ -34,6 +38,11 @@ inline void callTaskFunc(
         const TaskExecutorCancelParam_t<TaskFunc>& cancelParam,
         ThreadLocalData_t<TaskFunc>* threadLocalData,
         const ReadOnlySharedData_t<TaskFunc>* readOnlySharedData);
+
+using toString = std::function<std::string(const boost::any&)>;
+using fromString = std::function<boost::any(const std::string&)>;
+using ParametersRegistry = std::map<int, std::pair<toString, fromString>>;
+
 
 } // namespace task_engine
 } // namespace silver_bullets

@@ -1,0 +1,14 @@
+The list of libs for tornado:
+
+libabsl20200225_0_20200225.2-3_bpo10+1_amd64
+libc-ares2_1.16.1-1_amd64
+libgrpc++-dev_1.30.2-2_bpo10+1_amd64
+libgrpc++1_1.30.2-2_bpo10+1_amd64
+libgrpc-dev_1.30.2-2_bpo10+1_amd64
+libgrpc10_1.30.2-2_bpo10+1_amd64
+libprotobuf-dev_3.12.3-2_bpo10+1_amd64
+libprotobuf23_3.12.3-2_bpo10+1_amd64
+libprotoc23_3.12.3-2_bpo10+1_amd64
+libssl1.1_1.1.0l-1_deb9u1_amd64  // for old libc
+protobuf-compiler-grpc_1.30.2-2_bpo10+1_amd64
+protobuf-compiler_3.12.3-2_bpo10+1_amd64
