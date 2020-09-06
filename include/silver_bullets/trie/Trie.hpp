@@ -13,8 +13,11 @@ public:
 
     static constexpr const Index InvalidIndex = Index(~0);
 
+//    Index add(const std::string& str,
+//              std::enable_if_t<std::is_same_v<character_type, char>, int> = 0)
+// Note: sometimes we need to use this header file in a c++11 environment, where ..._t and ..._v are not available
     Index add(const std::string& str,
-              std::enable_if_t<std::is_same_v<character_type, char>, int> = 0)
+              typename std::enable_if<std::is_same<character_type, char>::value, int>::type = 0)
     {
         return add(str.c_str());
     }
