@@ -63,7 +63,13 @@ public:
         configOverrider(*this);
     }
 
-    ConfigLoader(const std::string& fileName)
+    template<class Overrider>
+    explicit ConfigLoader(Overrider configOverrider)
+    {
+        configOverrider(*this);
+    }
+
+    explicit ConfigLoader(const std::string& fileName)
     {
         load(fileName);
     }
