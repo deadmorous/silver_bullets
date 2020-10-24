@@ -1,0 +1,34 @@
+#!/bin/bash
+
+#this is example of how to run a client-server applications on slurm.
+
+#SBATCH --nodes=2
+#SBATCH --tasks-per-node=1
+#SBATCH --cpus-per-task=28
+#SBATCH -p tornado
+#SBATCH -t 10-00:00:00
+#SBATCH -J remoteworker
+#SBATCH -o remoteworker-%j.out
+#SBATCH -e remoteworker-%j.err
+
+nodes=$(scontrol show hostnames $SLURM_JOB_NODELIST) # Getting the node names
+nodes_array=( $nodes )
+
+node_1=${nodes_array[0]}
+node_2=${nodes_array[1]}
+ip_1=$(srun --nodes=1 --ntasks=1 -w $node_1 hostname --ip-address)
+ip_2=$(srun --nodes=1 --ntasks=1 -w $node_2 hostname --ip-address)
+echo $ip_1 #server ip
+echo $ip_2
+
+if [ -f /home/immtktm/b/bin/setenv_gcc72 ]; then
+source /home/immtktm/b/bin/setenv_gcc72
+fi
+
+echo "print SLURM_JOB_NODELIST = $SLURM_JOB_NODELIST"
+
+#replace it
+build_dir = /home/immtktm/eusik/build_bull
+source_dir = /home/immtktm/eusik/silver_bullets
+
+srun $source_dir/examples/use_task_engine_remote/run.sh $ip_1 $build_dir/bin/

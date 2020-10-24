@@ -34,6 +34,7 @@
 #include "silver_bullets/task_engine.hpp"
 
 #include <boost/lexical_cast.hpp>
+#include <boost/program_options.hpp>
 
 using grpc::Channel;
 using grpc::ClientContext;
@@ -123,7 +124,7 @@ void test_01()
 //         +-----+
 //            |
 //            15
-void test_04(const sync::CancelController::Checker& isCancelled)
+void test_04(const std::string& host, const sync::CancelController::Checker& isCancelled)
 {
     // TODO: use cancel
     using TaskFunc = StatefulCancellableTaskFunc;
@@ -181,8 +182,13 @@ void test_04(const sync::CancelController::Checker& isCancelled)
     for (auto i = 0; i < 2; ++i)
     {
         auto channel = grpc::CreateChannel(
-            "localhost:" + std::to_string(port),
+            host + ":" + std::to_string(port),
             grpc::InsecureChannelCredentials());
+
+        //wait for connected to server 10 seconds
+        channel->WaitForConnected(gpr_time_add(
+                                      gpr_now(GPR_CLOCK_REALTIME),
+                                      gpr_time_from_seconds(10, GPR_TIMESPAN)));
         auto tx =
             std::make_shared<TTX>(channel, paramregistry, resType, &isCancelled);
         x.addTaskExecutor(tx);
@@ -228,6 +234,29 @@ void test_04(const sync::CancelController::Checker& isCancelled)
 int main(int argc, char** argv)
 {
 
+    namespace po = boost::program_options;
+    po::options_description po_generic("Gerneric options");
+    po_generic.add_options()
+            ("help,h", "produce help message");
+    po::options_description po_basic("Main options");
+    auto po_value = [](auto& x) {
+        return boost::program_options::value(&x);
+    };
+    std::string host;
+    po_basic.add_options()
+            ("host", po_value(host), "Host name");
+
+    po::variables_map vm;
+    auto po_alloptions = po::options_description().add(po_generic).add(po_basic);
+    po::store(po::command_line_parser(argc, argv)
+              .options(po_alloptions).run(), vm);
+    po::notify(vm);
+
+    if (vm.count("help")) {
+        std::cout << po_alloptions << "\n";
+        return 0;
+    }
+
     TaskQueueFuncRegistry funcRegistry;
 
     //    funcRegistry[0] = [](boost::any& threadLocalState,
@@ -242,10 +271,10 @@ int main(int argc, char** argv)
     //                  << std::endl;
     //    };
 
-    funcRegistry[0] = [](boost::any&,
+    funcRegistry[0] = [&host](boost::any&,
                          const sync::CancelController::Checker& isCancelled) {
         std::cout << "********** STARTING test_04 **********" << std::endl;
-        test_04(isCancelled);
+        test_04(host, isCancelled);
         std::cout << "********** FINISHED test_04 **********" << std::endl
                   << std::endl;
     };
