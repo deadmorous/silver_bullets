@@ -4,6 +4,16 @@
 
 namespace silver_bullets {
 namespace templatize {
+
+// sequence of integer / enum values
+template<class T, T... Items>
+struct id_sequence {
+    using value_type = T;
+    static constexpr size_t size() noexcept {
+        return (sizeof...(Items));
+    }
+};
+
 namespace detail {
 
 template <class P>
@@ -12,7 +22,7 @@ class SingleTemplateArgResolver
 public:
     template <class Caller, class ArgsAsTuple>
     static auto run(
-        typename std::integer_sequence<P>,
+        typename id_sequence<P>,
         const std::tuple<P>&,
         const Caller&,
         const ArgsAsTuple&)
@@ -21,7 +31,7 @@ public:
     }
     template <class Caller, class ArgsAsTuple, P p1, P... rest>
     static auto run(
-        typename std::integer_sequence<P, p1, rest...>,
+        typename id_sequence<P, p1, rest...>,
         const std::tuple<P>& a2t,
         const Caller& caller,
         const ArgsAsTuple& args)
@@ -31,7 +41,7 @@ public:
                 std::make_index_sequence<std::tuple_size_v<ArgsAsTuple>>(), caller, args);
         else
             return run(
-                typename std::integer_sequence<P, rest...>(), a2t, caller, args);
+                typename id_sequence<P, rest...>(), a2t, caller, args);
     }
 
 private:

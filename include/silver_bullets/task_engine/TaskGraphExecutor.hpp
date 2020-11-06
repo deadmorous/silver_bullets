@@ -160,7 +160,7 @@ public:
 private:
     struct ExecutorInfo {
         std::shared_ptr<TaskExecutor<TaskFunc>> executor;
-        std::size_t taskId = ~0;
+        std::size_t taskId = static_cast<std::size_t>(~0);
     };
     struct ResourceInfo
     {

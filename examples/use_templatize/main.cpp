@@ -3,10 +3,9 @@
 
 #include "silver_bullets/templatize/resolve_template_args.hpp"
 
-
 using namespace std;
 
-enum class E { E1, E2, E3 };
+enum class E : unsigned int { E1, E2, E3 };
 
 template <int i>
 void ft1(double x) {
@@ -46,16 +45,16 @@ void f(int i, E e, int j, double x)
     using namespace silver_bullets;
 
     resolve_template_args<
-            integer_sequence<int, 1,2,3>>(
+            templatize::id_sequence<int, 1,2,3>>(
                 make_tuple(i), callFt1(), x);
     resolve_template_args<
-            integer_sequence<int, 1,2,3>,
-            integer_sequence<E, E::E1,E::E2,E::E3>>(
+            templatize::id_sequence<int, 1,2,3>,
+            templatize::id_sequence<E, E::E1,E::E2,E::E3>>(
                 make_tuple(i,e), callFt2(), x);
     resolve_template_args<
-            integer_sequence<int, 1,2,3>,
-            integer_sequence<E, E::E1,E::E2,E::E3>,
-            integer_sequence<int, 4,5,6>>(
+            templatize::id_sequence<int, 1,2,3>,
+            templatize::id_sequence<E, E::E1,E::E2,E::E3>,
+            templatize::id_sequence<int, 4,5,6>>(
                 make_tuple(i,e,j), callFt3(), x);
 }
 

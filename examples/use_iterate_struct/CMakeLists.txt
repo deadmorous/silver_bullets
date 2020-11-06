@@ -10,7 +10,11 @@ find_package(Boost REQUIRED program_options)
 
 aux_source_directory(. SOURCE_FILES)
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} stdc++fs ${Boost_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES})
+
+if (UNIX)
+	target_link_libraries(${PROJECT_NAME} stdc++fs)
+endif ()
 
 set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY
   COMPILE_DEFINITIONS $<$<CONFIG:Debug>:_DEBUG>

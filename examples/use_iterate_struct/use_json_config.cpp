@@ -11,7 +11,8 @@
 #include <boost/program_options.hpp>
 
 using namespace std;
-using namespace silver_bullets::iterate_struct;
+using namespace silver_bullets;
+using namespace iterate_struct;
 
 enum class ParamType { One, Two, Vector };
 
@@ -118,7 +119,7 @@ void use_json_config(int argc, char *argv[])
         });
         auto paramType = configLoader.valueAt<ParamType>("/type", ParamType::Two);
         silver_bullets::resolve_template_args<
-                integer_sequence<ParamType, ParamType::One, ParamType::Two, ParamType::Vector>>
+                templatize::id_sequence<ParamType, ParamType::One, ParamType::Two, ParamType::Vector>>
                 (make_tuple(paramType), useConfigCaller(), configLoader);
     }
 }

@@ -26,12 +26,12 @@ public:
         if (name.empty())
             return std::string();
         else if (exists(name))
-            return current_path() / name;
+            return (current_path() / name).string();
         else {
             auto searchConfig = [&] (const char *env) {
                 auto dir = getenv(env);
                 if (dir) {
-                    auto result = std::string(path(dir) / name);
+                    auto result = (path(dir) / name).string();
                     if (exists(result))
                         return result;
                 }

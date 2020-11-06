@@ -10,6 +10,11 @@ set (SILVER_BULLETS_ROOT_DIR ${CMAKE_CURRENT_LIST_DIR})
 set (SILVER_BULLETS_INCLUDE_DIR ${SILVER_BULLETS_ROOT_DIR}/include/silver_bullets)
 option (BUILD_REMOTE_EXECUTOR OFF)
 
+if(WIN32)
+    set(Boost_USE_STATIC_LIBS        ON)
+    set(Boost_USE_STATIC_RUNTIME    OFF)
+endif()
+
 find_package(Boost)
 
 include_directories (${Boost_INCLUDE_DIRS})
