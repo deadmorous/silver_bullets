@@ -37,7 +37,7 @@ public:
     template <class T>
     void print(const T& x) const
     {
-        if (print_priv(x, true))
+        if (print_priv((JsonValue&) x, true))
             m_s << std::endl;
     }
 
