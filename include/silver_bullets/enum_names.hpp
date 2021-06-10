@@ -68,3 +68,16 @@ constexpr boost::iterator_range<const std::pair<E, const char*>*> enum_item_rang
         }; \
     }; \
     }
+
+#define SILVER_BULLETS_DEF_ENUM_STREAM_IO(EnumClassType) \
+    inline std::ostream& operator<<( std::ostream& s, EnumClassType x ) { \
+        return s << silver_bullets::enum_item_name(x); \
+    } \
+    inline std::istream& operator>>( std::istream& s, EnumClassType& x ) \
+    { \
+        std::string str; \
+        s >> str; \
+        x = silver_bullets::enum_item_value<EnumClassType>( str ); \
+        return s; \
+    } \
+    static_assert(true)
