@@ -106,8 +106,12 @@ private:
         return result;
     }
 
-    rapidjson::Document generate_priv(const JsonValue& x) const {
-        return x.toRapidjsonDocument();
+    rapidjson::Value generate_priv(const JsonValue& x) const
+    {
+        auto doc = x.toRapidjsonDocument();
+        rapidjson::Value result(doc.GetType());
+        result.CopyFrom(doc, m_allocator, true);
+        return result;
     }
 
     rapidjson::Document::AllocatorType& m_allocator;
