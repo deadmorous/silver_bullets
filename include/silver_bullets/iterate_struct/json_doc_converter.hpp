@@ -137,7 +137,7 @@ inline rapidjson::Document to_json_doc(const T& value)
 }
 
 
-
+template<bool quiet>
 class json_parser
 {
 public:
@@ -150,7 +150,7 @@ public:
             try {
                 value = parse_priv<T>(it->value);
             } catch(std::runtime_error& e) {
-                throw std::runtime_error(std::string("Offending value: ") + name + "; " + e.what());
+                throw std::runtime_error(std::string("\nOffending value: ") + name + "; " + e.what());
             }
             m_visited_values.top().insert(name);
         }
@@ -220,7 +220,7 @@ private:
     struct DebugDumper {
         mutable std::string result;
         template<typename T>
-        void operator()(T& val, const char* name) const { result += name; result += " "; };
+        void operator()(T& val, const char* name) const { result += name; result += "; "; };
     };
 
     template <class T, std::enable_if_t<iterate_struct::has_iterate_struct_helper_v<T>, int> = 0>
@@ -233,14 +233,14 @@ private:
         m_visited_values.emplace();
 
         for_each(result, *this);
-
-        if(m_visited_values.top().size() != node.MemberCount())
-            for(auto iter = node.MemberBegin(); iter < node.MemberEnd(); iter++)
-                if(m_visited_values.top().find(iter->name.GetString()) == m_visited_values.top().end()) {
-                    DebugDumper dumper;
-                    for_each(result, dumper);
-                    throw std::runtime_error(std::string("Unused variable in json: ") + iter->name.GetString() + ". Expected variables: " + dumper.result);
-                }
+        if constexpr (!quiet)
+            if(m_visited_values.top().size() != node.MemberCount())
+                for(auto iter = node.MemberBegin(); iter < node.MemberEnd(); iter++)
+                    if(m_visited_values.top().find(iter->name.GetString()) == m_visited_values.top().end()) {
+                        DebugDumper dumper;
+                        for_each(result, dumper);
+                        throw std::runtime_error(std::string("\nUnused variable in json: ") + iter->name.GetString() + "\nExpected variables: " + dumper.result);
+                    }
 
         m_nodes.pop();
         m_visited_values.pop();
@@ -298,14 +298,19 @@ private:
     mutable std::stack<std::set<std::string>> m_visited_values;
 };
 
-template<class T>
+template<class T, bool quiet = false>
 inline T from_json(const rapidjson::Value& value) {
-    return json_parser::parse<T>(value);
+    return json_parser<quiet>::template parse<T>(value);
 }
 
 template<class T>
 inline T from_json_doc(const rapidjson::Document& document) {
-    return from_json<T>(document);
+    return from_json<T, false>(document);
+}
+
+template<class T>
+inline T from_json_doc_quiet(const rapidjson::Document& document) {
+    return from_json<T, true>(document);
 }
 
 } // namespace iterate_struct
