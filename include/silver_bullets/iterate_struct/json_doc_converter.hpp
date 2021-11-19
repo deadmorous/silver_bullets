@@ -135,6 +135,7 @@ inline rapidjson::Document to_json_doc(const T& value)
 
 
 
+template<class Validator>
 class json_parser
 {
 public:
@@ -142,19 +143,34 @@ public:
     inline void operator()(T& value, const char *name) const
     {
         auto& node = *m_nodes.back();
+        m_validator.template enterNode<T>(node, name);
         if (!node.IsObject())
             return;
         auto it = node.FindMember(name);
         if(it != node.MemberEnd())
-            value = parse_priv<T>(it->value);
+            value = parse_priv_<T>(it->value);
+        m_validator.template exitNode<T>(node, name);
     }
 
     template<class T>
-    static T parse(const rapidjson::Value& value) {
-        return json_parser().parse_priv<T>(value);
+    static std::tuple<T, Validator> parse(const rapidjson::Value& value, Validator&& validator)
+    {
+        json_parser<Validator> parser(std::move(validator));
+        return { parser.parse_priv_<T>(value), std::move(parser.m_validator) };
     }
 
 private:
+
+    explicit json_parser(Validator&& validator) :
+        m_validator(std::move(validator))
+    {}
+
+    template<class T>
+    T parse_priv_(const rapidjson::Value& node) const {
+        m_validator.template enterValue<T>(node);
+        return parse_priv<T>(node);
+        m_validator.template exitValue<T>(node);
+    }
 
     template <
             class T,
@@ -269,16 +285,52 @@ private:
     }
 
     mutable std::vector<const rapidjson::Value*> m_nodes;
+    mutable Validator m_validator;
 };
 
-template<class T>
-inline T from_json(const rapidjson::Value& value) {
-    return json_parser::parse<T>(value);
+struct EmptyValidator
+{
+    template<class T>
+    inline void enterNode(const rapidjson::Value& /*node*/, const char */*name*/) {}
+
+    template<class T>
+    inline void exitNode(const rapidjson::Value& /*node*/, const char */*name*/) {}
+
+    template<class T>
+    inline void enterValue(const rapidjson::Value& /*node*/) {}
+
+    template<class T>
+    inline void exitValue(const rapidjson::Value& /*node*/) {}
+};
+
+template<class T, class Validator=EmptyValidator>
+inline std::tuple<T, Validator>
+validated_from_json(const rapidjson::Value& value,
+                    Validator&& validator = Validator{})
+{
+    return json_parser<Validator>::template parse<T>(value, std::move(validator));
 }
 
-template<class T>
-inline T from_json_doc(const rapidjson::Document& document) {
-    return from_json<T>(document);
+template<class T, class Validator=EmptyValidator>
+inline std::tuple<T, Validator>
+validated_from_json_doc(const rapidjson::Document& document,
+                        Validator&& validator = Validator{})
+{
+    return validated_from_json<T>(document, std::move(validator));
+}
+
+template<class T, class Validator=EmptyValidator>
+inline T from_json(const rapidjson::Value& value,
+                   Validator&& validator = Validator{})
+{
+    return std::get<0>(validated_from_json<T>(value, std::move(validator)));
+}
+
+template<class T, class Validator=EmptyValidator>
+inline T from_json_doc(const rapidjson::Document& document,
+                       Validator&& validator = Validator{})
+{
+    return std::get<0>(validated_from_json_doc<T>(document, std::move(validator)));
 }
 
 } // namespace iterate_struct
