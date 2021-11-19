@@ -6,6 +6,9 @@
 
 #include <rapidjson/document.h>
 #include <list>
+#include <set>
+#include <stack>
+#include <iostream>
 #include <boost/assert.hpp>
 
 #include "silver_bullets/enum_names.hpp"
@@ -141,12 +144,16 @@ public:
     template<class T>
     inline void operator()(T& value, const char *name) const
     {
-        auto& node = *m_nodes.back();
-        if (!node.IsObject())
-            return;
+        auto& node = *m_nodes.top();
         auto it = node.FindMember(name);
-        if(it != node.MemberEnd())
-            value = parse_priv<T>(it->value);
+        if(it != node.MemberEnd()) {
+            try {
+                value = parse_priv<T>(it->value);
+            } catch(std::runtime_error& e) {
+                throw std::runtime_error(std::string("Offending value: ") + name + "; " + e.what());
+            }
+            m_visited_values.top().insert(name);
+        }
     }
 
     template<class T>
@@ -210,14 +217,33 @@ private:
         return node.GetString();
     }
 
+    struct DebugDumper {
+        mutable std::string result;
+        template<typename T>
+        void operator()(T& val, const char* name) const { result += name; result += " "; };
+    };
+
     template <class T, std::enable_if_t<iterate_struct::has_iterate_struct_helper_v<T>, int> = 0>
     T parse_priv(const rapidjson::Value& node) const
     {
         T result;
-        m_nodes.push_back(&node);
-        if (!node.IsNull() && node.IsObject())
-            for_each(result, *this);
-        m_nodes.pop_back();
+        if(!node.IsObject())
+            throw std::runtime_error("Value in JSON document has an invalid type, expected an object");
+        m_nodes.push(&node);
+        m_visited_values.emplace();
+
+        for_each(result, *this);
+
+        if(m_visited_values.top().size() != node.MemberCount())
+            for(auto iter = node.MemberBegin(); iter < node.MemberEnd(); iter++)
+                if(m_visited_values.top().find(iter->name.GetString()) == m_visited_values.top().end()) {
+                    DebugDumper dumper;
+                    for_each(result, dumper);
+                    throw std::runtime_error(std::string("Unused variable in json: ") + iter->name.GetString() + ". Expected variables: " + dumper.result);
+                }
+
+        m_nodes.pop();
+        m_visited_values.pop();
         return result;
     }
 
@@ -268,7 +294,8 @@ private:
         return T(node);
     }
 
-    mutable std::vector<const rapidjson::Value*> m_nodes;
+    mutable std::stack<const rapidjson::Value*> m_nodes;
+    mutable std::stack<std::set<std::string>> m_visited_values;
 };
 
 template<class T>
