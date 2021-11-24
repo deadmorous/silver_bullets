@@ -3,9 +3,11 @@
 #include <iostream>
 #include "iterate_struct.hpp"
 #include "JsonValue_fwd.hpp"
+#include "validators.hpp"
 
 #include <rapidjson/document.h>
 #include <list>
+
 #include <boost/assert.hpp>
 
 #include "silver_bullets/enum_names.hpp"
@@ -143,13 +145,13 @@ public:
     inline void operator()(T& value, const char *name) const
     {
         auto& node = *m_nodes.back();
-        m_validator.template enterNode<T>(node, name);
         if (!node.IsObject())
             return;
         auto it = node.FindMember(name);
-        if(it != node.MemberEnd())
+        if(it != node.MemberEnd()) {
+            ValidatorNodeGuard g(m_validator, name);
             value = parse_priv_<T>(it->value);
-        m_validator.template exitNode<T>(node, name);
+        }
     }
 
     template<class T>
@@ -166,10 +168,11 @@ private:
     {}
 
     template<class T>
-    T parse_priv_(const rapidjson::Value& node) const {
-        m_validator.template enterValue<T>(node);
-        return parse_priv<T>(node);
-        m_validator.template exitValue<T>(node);
+    T parse_priv_(const rapidjson::Value& node) const
+    {
+        auto result = parse_priv<T>(node);
+        m_validator.validate(result, ChildNameGetter(node));
+        return result;
     }
 
     template <
@@ -284,26 +287,49 @@ private:
         return T(node);
     }
 
+    class ChildNameGetter
+    {
+    public:
+        std::vector<std::string> operator()() const
+        {
+            std::vector<std::string> result;
+            if (m_node.IsObject()) {
+                auto o = m_node.GetObject();
+                for (auto it=o.MemberBegin(); it!=o.MemberEnd(); ++it)
+                    result.push_back(it->name.GetString());
+            }
+            return result;
+        }
+
+    private:
+        explicit ChildNameGetter(const rapidjson::Value& node) :
+            m_node(node)
+        {}
+
+        const rapidjson::Value& m_node;
+        friend class json_parser<Validator>;
+    };
+
+    class ValidatorNodeGuard
+    {
+    public:
+        ValidatorNodeGuard(Validator& validator, const char *name) : m_validator(validator) {
+            m_validator.enterNode(name);
+        }
+
+        ~ValidatorNodeGuard() {
+            m_validator.exitNode();
+        }
+
+    private:
+        Validator& m_validator;
+    };
+
     mutable std::vector<const rapidjson::Value*> m_nodes;
     mutable Validator m_validator;
 };
 
-struct EmptyValidator
-{
-    template<class T>
-    inline void enterNode(const rapidjson::Value& /*node*/, const char */*name*/) {}
-
-    template<class T>
-    inline void exitNode(const rapidjson::Value& /*node*/, const char */*name*/) {}
-
-    template<class T>
-    inline void enterValue(const rapidjson::Value& /*node*/) {}
-
-    template<class T>
-    inline void exitValue(const rapidjson::Value& /*node*/) {}
-};
-
-template<class T, class Validator=EmptyValidator>
+template<class T, class Validator=DefaultValidator>
 inline std::tuple<T, Validator>
 validated_from_json(const rapidjson::Value& value,
                     Validator&& validator = Validator{})
@@ -311,7 +337,7 @@ validated_from_json(const rapidjson::Value& value,
     return json_parser<Validator>::template parse<T>(value, std::move(validator));
 }
 
-template<class T, class Validator=EmptyValidator>
+template<class T, class Validator=DefaultValidator>
 inline std::tuple<T, Validator>
 validated_from_json_doc(const rapidjson::Document& document,
                         Validator&& validator = Validator{})
@@ -319,14 +345,14 @@ validated_from_json_doc(const rapidjson::Document& document,
     return validated_from_json<T>(document, std::move(validator));
 }
 
-template<class T, class Validator=EmptyValidator>
+template<class T, class Validator=DefaultValidator>
 inline T from_json(const rapidjson::Value& value,
                    Validator&& validator = Validator{})
 {
     return std::get<0>(validated_from_json<T>(value, std::move(validator)));
 }
 
-template<class T, class Validator=EmptyValidator>
+template<class T, class Validator=DefaultValidator>
 inline T from_json_doc(const rapidjson::Document& document,
                        Validator&& validator = Validator{})
 {

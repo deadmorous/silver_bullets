@@ -52,96 +52,10 @@ struct Foo
 };
 SILVER_BULLETS_DESCRIBE_TEMPLATE_STRUCTURE_FIELDS(((ParamType, ParamType)), Foo, type, parameters)
 
-template<typename T, typename = void>
-struct ValueChecker
-{
-    void operator()(const rapidjson::Value&) const
-    {
-        cout << "==== NOT REALLY CHECKING A VALUE" << endl;
-    }
-};
-
-template<typename T>
-struct ValueChecker<T, enable_if_t<has_iterate_struct_helper_v<T>>>
-{
-    void operator()(const rapidjson::Value& node) const
-    {
-        cout << "==== CHECKING STRUCT: " << typeid (T).name() << endl;
-        if (!node.IsObject()) {
-            cout << "==== ERROR: JSON Value is not an object" << endl;
-            return;
-        }
-
-        set<string> names;
-        T tmp;
-        for_each(tmp, [&](auto&, const char* name) {
-            names.insert(name);
-        });
-
-        auto o = node.GetObject();
-        for (auto it=o.MemberBegin(); it!=o.MemberEnd(); ++it) {
-            auto name = it->name.GetString();
-            if (names.count(name) == 0)
-                cout << "==== ERROR: JSON object contains an extra name: " << name << endl;
-            names.erase(name);
-        }
-
-        for(auto& name: names) {
-            cout << "==== WARNING: JSON object does not contain name: " << name << endl;
-        }
-        cout << "==== DONE" << endl;
-    }
-};
-
-template<typename T>
-void check_value(const rapidjson::Value& node)
-{
-    ValueChecker<T>{}(node);
-}
-
-class ConfigValidator
-{
-public:
-    template<class T>
-    inline void enterNode(const rapidjson::Value& /*node*/, const char *name)
-    {
-        cout << pad() << "ENTER NODE " << name
-             << ": " << typeid (T).name() << endl;
-        ++m_level;
-    }
-
-    template<class T>
-    inline void exitNode(const rapidjson::Value& /*node*/, const char *name)
-    {
-        --m_level;
-        cout << pad() << "EXIT NODE " << name << endl;
-    }
-
-    template<class T>
-    inline void enterValue(const rapidjson::Value& node)
-    {
-        cout << pad() << "ENTER VALUE: "
-             << typeid(T).name() << endl;
-        check_value<T>(node);
-    }
-
-    template<class T>
-    inline void exitValue(const rapidjson::Value& /*node*/)
-    {
-        cout << pad() << "EXIT VALUE" << endl;
-    }
-
-private:
-    unsigned int m_level = 0;
-    string pad() const {
-        return string(m_level*4, ' ');
-    }
-};
-
 template <ParamType paramType>
 void useConfig(const ConfigLoader& configLoader)
 {
-    auto foo = configLoader.value<Foo<paramType>>(ConfigValidator{});
+    auto foo = configLoader.value<Foo<paramType>>();
     cout << "Loaded data from config:" << endl;
     write_json_doc(cout, to_json_doc(foo));
     cout << "\n\nParameter origin report:" << endl;
