@@ -33,6 +33,12 @@ struct TwoParam {
 };
 SILVER_BULLETS_DESCRIBE_STRUCTURE_FIELDS(TwoParam, p1, p2, json);
 
+void validate(const TwoParam& x)
+{
+    if (x.p1 < 0)
+        throw std::runtime_error("p1 must be non-negative");
+}
+
 struct VectorParam {
     vector<int> p;
 };

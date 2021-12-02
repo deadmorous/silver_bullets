@@ -83,14 +83,9 @@ public:
         return *this;
     }
 
-    template<class T, class Validator=DefaultValidator>
+    template<class T, class Validator=DefaultValidator<>>
     T value(Validator&& validator = Validator{}) const {
         return iterate_struct::from_json_doc<T>(m_config, std::move(validator));
-    }
-
-    template<class T, class Validator=DefaultValidator>
-    std::tuple<T, Validator> validated_value(Validator&& validator = Validator{}) const {
-        return iterate_struct::validated_from_json_doc<T>(m_config, std::move(validator));
     }
 
     template<class T>

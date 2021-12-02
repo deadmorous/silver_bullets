@@ -155,10 +155,15 @@ public:
     }
 
     template<class T>
-    static std::tuple<T, Validator> parse(const rapidjson::Value& value, Validator&& validator)
+    static T parse(const rapidjson::Value& value, Validator&& validator)
     {
         json_parser<Validator> parser(std::move(validator));
-        return { parser.parse_priv_<T>(value), std::move(parser.m_validator) };
+        auto result = parser.parse_priv_<T>(value);
+
+        // This is technically required in order to throw exception in the case of an error
+        auto unused = std::move(parser.m_validator);
+
+        return result;
     }
 
 private:
@@ -329,34 +334,18 @@ private:
     mutable Validator m_validator;
 };
 
-template<class T, class Validator=DefaultValidator>
-inline std::tuple<T, Validator>
-validated_from_json(const rapidjson::Value& value,
-                    Validator&& validator = Validator{})
+template<class T, class Validator=DefaultValidator<>>
+inline T from_json(const rapidjson::Value& value,
+                   Validator&& validator = Validator{})
 {
     return json_parser<Validator>::template parse<T>(value, std::move(validator));
 }
 
-template<class T, class Validator=DefaultValidator>
-inline std::tuple<T, Validator>
-validated_from_json_doc(const rapidjson::Document& document,
-                        Validator&& validator = Validator{})
-{
-    return validated_from_json<T>(document, std::move(validator));
-}
-
-template<class T, class Validator=DefaultValidator>
-inline T from_json(const rapidjson::Value& value,
-                   Validator&& validator = Validator{})
-{
-    return std::get<0>(validated_from_json<T>(value, std::move(validator)));
-}
-
-template<class T, class Validator=DefaultValidator>
+template<class T, class Validator=DefaultValidator<>>
 inline T from_json_doc(const rapidjson::Document& document,
                        Validator&& validator = Validator{})
 {
-    return std::get<0>(validated_from_json_doc<T>(document, std::move(validator)));
+    return from_json<T>(document, std::move(validator));
 }
 
 } // namespace iterate_struct
