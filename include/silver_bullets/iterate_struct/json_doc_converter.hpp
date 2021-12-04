@@ -3,9 +3,11 @@
 #include <iostream>
 #include "iterate_struct.hpp"
 #include "JsonValue_fwd.hpp"
+#include "validators.hpp"
 
 #include <rapidjson/document.h>
 #include <list>
+
 #include <boost/assert.hpp>
 
 #include "silver_bullets/enum_names.hpp"
@@ -135,6 +137,7 @@ inline rapidjson::Document to_json_doc(const T& value)
 
 
 
+template<class Validator>
 class json_parser
 {
 public:
@@ -145,16 +148,37 @@ public:
         if (!node.IsObject())
             return;
         auto it = node.FindMember(name);
-        if(it != node.MemberEnd())
-            value = parse_priv<T>(it->value);
+        if(it != node.MemberEnd()) {
+            ValidatorNodeGuard g(m_validator, name);
+            value = parse_priv_<T>(it->value);
+        }
     }
 
     template<class T>
-    static T parse(const rapidjson::Value& value) {
-        return json_parser().parse_priv<T>(value);
+    static T parse(const rapidjson::Value& value, Validator&& validator)
+    {
+        json_parser<Validator> parser(std::move(validator));
+        auto result = parser.parse_priv_<T>(value);
+
+        // This is technically required in order to throw exception in the case of an error
+        auto unused = std::move(parser.m_validator);
+
+        return result;
     }
 
 private:
+
+    explicit json_parser(Validator&& validator) :
+        m_validator(std::move(validator))
+    {}
+
+    template<class T>
+    T parse_priv_(const rapidjson::Value& node) const
+    {
+        auto result = parse_priv<T>(node);
+        m_validator.validate(result, ChildNameGetter(node));
+        return result;
+    }
 
     template <
             class T,
@@ -268,17 +292,60 @@ private:
         return T(node);
     }
 
+    class ChildNameGetter
+    {
+    public:
+        std::vector<std::string> operator()() const
+        {
+            std::vector<std::string> result;
+            if (m_node.IsObject()) {
+                auto o = m_node.GetObject();
+                for (auto it=o.MemberBegin(); it!=o.MemberEnd(); ++it)
+                    result.push_back(it->name.GetString());
+            }
+            return result;
+        }
+
+    private:
+        explicit ChildNameGetter(const rapidjson::Value& node) :
+            m_node(node)
+        {}
+
+        const rapidjson::Value& m_node;
+        friend class json_parser<Validator>;
+    };
+
+    class ValidatorNodeGuard
+    {
+    public:
+        ValidatorNodeGuard(Validator& validator, const char *name) : m_validator(validator) {
+            m_validator.enterNode(name);
+        }
+
+        ~ValidatorNodeGuard() {
+            m_validator.exitNode();
+        }
+
+    private:
+        Validator& m_validator;
+    };
+
     mutable std::vector<const rapidjson::Value*> m_nodes;
+    mutable Validator m_validator;
 };
 
-template<class T>
-inline T from_json(const rapidjson::Value& value) {
-    return json_parser::parse<T>(value);
+template<class T, class Validator=DefaultValidator<>>
+inline T from_json(const rapidjson::Value& value,
+                   Validator&& validator = Validator{})
+{
+    return json_parser<Validator>::template parse<T>(value, std::move(validator));
 }
 
-template<class T>
-inline T from_json_doc(const rapidjson::Document& document) {
-    return from_json<T>(document);
+template<class T, class Validator=DefaultValidator<>>
+inline T from_json_doc(const rapidjson::Document& document,
+                       Validator&& validator = Validator{})
+{
+    return from_json<T>(document, std::move(validator));
 }
 
 } // namespace iterate_struct
