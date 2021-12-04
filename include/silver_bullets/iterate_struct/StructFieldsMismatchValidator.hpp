@@ -13,6 +13,8 @@
 
 namespace silver_bullets::iterate_struct {
 
+namespace detail {
+
 struct StructFieldsMismatch
 {
     std::set<std::string> extraNames;
@@ -48,6 +50,8 @@ StructFieldsMismatch struct_fields_mismatch(const T& value, const ChildNameGette
     return { std::move(extraNames), std::move(missingNames) };
 }
 
+} // detail
+
 class StructFieldsMismatchValidator
 {
 public:
@@ -58,12 +62,12 @@ public:
                   const ChildNameGetter& childNameGetter)
     {
         if constexpr(has_iterate_struct_helper_v<T>)
-            if (auto mismatch = struct_fields_mismatch(value, childNameGetter))
+            if (auto mismatch = detail::struct_fields_mismatch(value, childNameGetter))
                 report( state, mismatch, pathGetter );
     }
 
     void report(ValidatorState& state,
-                const StructFieldsMismatch& mismatch,
+                const detail::StructFieldsMismatch& mismatch,
                 const TreePathTracker& pathGetter)
     {
         auto& s = *state.errorStream;
