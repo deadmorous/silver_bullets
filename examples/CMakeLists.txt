@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
+add_subdirectory(use_enum_names)
 add_subdirectory(use_iterate_struct)
 add_subdirectory(use_templatize)
 add_subdirectory(use_factory)
