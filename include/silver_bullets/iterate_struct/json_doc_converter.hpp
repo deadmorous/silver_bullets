@@ -56,8 +56,9 @@ private:
             std::enable_if_t<std::is_enum_v<T>, int> = 0>
     rapidjson::Value generate_priv(const T& x) const
     {
+        using R = typename enum_names<T>::name_repr;
         rapidjson::Value result;
-        result.SetString(enum_item_name(x), m_allocator);
+        result.Set<R>(enum_item_name(x), m_allocator);
         return result;
     }
 
@@ -219,9 +220,10 @@ private:
                 std::is_enum_v<T>, int> = 0>
     T parse_priv(const rapidjson::Value& node) const
     {
-        if (!node.IsString())
-            throw std::runtime_error("Value in JSON document has an invalid type, expected a string identifying an enumeration value");
-        return enum_item_value<T>(node.GetString());
+        using R = typename enum_names<T>::name_repr;
+        if (!node.Is<R>())
+            throw std::runtime_error("Value in JSON document has an invalid type"); // TODO: Report expected type
+        return enum_item_value<T>(node.Get<R>());
     }
 
     template <

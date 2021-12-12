@@ -16,6 +16,16 @@ inline constexpr std::size_t array_length(const std::pair<T, const char*>(&)[N])
     return N;
 }
 
+template<class R = const char*>
+using name_repr = R;
+
+template<class R = const char*>
+using repr_container =
+    std::conditional_t<std::is_same_v<R, const char*>, std::string, R>;
+
+template<class E>
+using name_container_repr = repr_container<typename enum_names<E>::name_repr>;
+
 } // namespace enum_names_detail
 
 template <class E>
@@ -24,7 +34,7 @@ inline constexpr std::size_t enum_item_count() {
 }
 
 template <class E>
-inline const char *enum_item_name(E e)
+inline typename enum_names<E>::name_repr enum_item_name(E e)
 {
     for (auto item : enum_names<E>::names) {
         if (item.first == e)
@@ -34,35 +44,38 @@ inline const char *enum_item_name(E e)
 }
 
 template <class E>
-inline E enum_item_value(const std::string& name) {
+inline E enum_item_value(
+    const enum_names_detail::name_container_repr<E>& name)
+{
     for (auto item : enum_names<E>::names) {
         if (item.second == name)
             return item.first;
     }
-    throw std::range_error(std::string("Unknown enum item name '") + name + "'");
+    throw std::range_error(std::string("Unknown enum item name '") + boost::lexical_cast<std::string>(name) + "'");
 }
 
 template <class E>
-inline constexpr const std::pair<E, const char*>* enum_item_begin() {
+inline constexpr const std::pair<E, typename enum_names<E>::name_repr>* enum_item_begin() {
     return enum_names<E>::names;
 }
 
 template <class E>
-inline constexpr const std::pair<E, const char*>* enum_item_end() {
+inline constexpr const std::pair<E, typename enum_names<E>::name_repr>* enum_item_end() {
     return enum_names<E>::names + enum_item_count<E>();
 }
 
 template <class E>
-constexpr boost::iterator_range<const std::pair<E, const char*>*> enum_item_range() {
+constexpr boost::iterator_range<const std::pair<E, typename enum_names<E>::name_repr>*> enum_item_range() {
     return { enum_item_begin<E>(), enum_item_end<E>() };
 }
 
 } // namespace silver_bullets
 
-#define SILVER_BULLETS_BEGIN_DEFINE_ENUM_NAMES(EnumClassType) \
+#define SILVER_BULLETS_BEGIN_DEFINE_ENUM_NAMES(EnumClassType, ...) \
     namespace silver_bullets { \
     template<> struct enum_names<EnumClassType> { \
-        static constexpr const std::pair<EnumClassType, const char*> names[] = {
+        using name_repr = enum_names_detail::name_repr<__VA_ARGS__>; \
+        static constexpr const std::pair<EnumClassType, name_repr> names[] = {
 
 #define SILVER_BULLETS_END_DEFINE_ENUM_NAMES() \
         }; \
@@ -75,9 +88,9 @@ constexpr boost::iterator_range<const std::pair<E, const char*>*> enum_item_rang
     } \
     inline std::istream& operator>>( std::istream& s, EnumClassType& x ) \
     { \
-        std::string str; \
-        s >> str; \
-        x = silver_bullets::enum_item_value<EnumClassType>( str ); \
+        typename silver_bullets::enum_names_detail::name_container_repr<EnumClassType> repr; \
+        s >> repr; \
+        x = silver_bullets::enum_item_value<EnumClassType>( repr ); \
         return s; \
     } \
     static_assert(true)
