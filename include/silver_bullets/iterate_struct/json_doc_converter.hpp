@@ -257,7 +257,7 @@ private:
             throw std::runtime_error("Value in JSON document has an invalid type, expected an array");
         auto array = node.GetArray();
         for (auto& val : array) {
-            result.emplace_back(parse_priv<typename T::value_type>(val));
+            result.emplace_back(parse_priv_<typename T::value_type>(val));
         }
         return result;
     }
@@ -271,8 +271,8 @@ private:
         if (array.Size() != 2)
             throw std::runtime_error("Value in JSON document is an array of an invalid length, expected length 2");
         return T {
-            parse_priv<typename T::first_type>(array[0]),
-            parse_priv<typename T::second_type>(array[1])
+            parse_priv_<typename T::first_type>(array[0]),
+            parse_priv_<typename T::second_type>(array[1])
         };
     }
 
@@ -285,7 +285,7 @@ private:
         auto object = node.GetObject();
         for (auto& member : object)
             result[boost::lexical_cast<typename T::key_type>(member.name.GetString())] =
-                    parse_priv<typename T::mapped_type>(member.value);
+                    parse_priv_<typename T::mapped_type>(member.value);
         return result;
     }
 
