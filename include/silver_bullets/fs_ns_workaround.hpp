@@ -1,6 +1,6 @@
 #pragma once
 
-#if (defined(__GNUC__) && (__GNUC_MINOR__ <= 7)) \
+#if (!defined(__clang__) && defined(__GNUC__) && (__GNUC__ <= 7)) \
     || (defined(__clang__) && __clang_major__ <= 6)
 #include <experimental/filesystem>
 namespace std {
