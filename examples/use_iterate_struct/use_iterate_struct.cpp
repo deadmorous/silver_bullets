@@ -56,6 +56,14 @@ SILVER_BULLETS_DESCRIBE_STRUCTURE_FIELDS(my::Bar, x, foo)
 SILVER_BULLETS_DESCRIBE_TEMPLATE_STRUCTURE_FIELDS(((class, T), (int, i)), my::WP2, x)
 
 
+// Fieldless structs are ok
+struct Fieldless {};
+SILVER_BULLETS_DESCRIBE_STRUCTURE_FIELDS(Fieldless)
+
+// Fieldless template structs are ok, too
+template<class, class> struct FieldlessTemplate {};
+SILVER_BULLETS_DESCRIBE_TEMPLATE_STRUCTURE_FIELDS(((class, A), (class, B)), FieldlessTemplate)
+
 
 using namespace std;
 

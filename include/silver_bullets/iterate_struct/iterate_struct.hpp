@@ -132,9 +132,16 @@ inline auto asTuple(S& s, std::enable_if_t<has_iterate_struct_helper_v<std::deca
 // See https://stackoverflow.com/questions/27765387/distributing-an-argument-in-a-variadic-macro
 #define SILVER_BULLETS_ITERATE_STRUCT_ACCESS_FIELD(r, instance, field) BOOST_PP_COMMA_IF(BOOST_PP_SUB(r, 2)) instance.field
 
-#define SILVER_BULLETS_ITERATE_STRUCT_ACCESS_FIELDS(instance, ...) \
+#define SILVER_BULLETS_ITERATE_STRUCT_ACCESS_SOME_FIELDS(instance, ...) \
     BOOST_PP_SEQ_FOR_EACH(SILVER_BULLETS_ITERATE_STRUCT_ACCESS_FIELD, \
         instance, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+
+#define SILVER_BULLETS_ITERATE_STRUCT_ACCESS_NO_FIELDS(...)
+
+#define SILVER_BULLETS_ITERATE_STRUCT_ACCESS_FIELDS(instance, ...) \
+    BOOST_PP_IF(BOOST_PP_SUB(BOOST_PP_VARIADIC_SIZE(0, ##__VA_ARGS__), 1), \
+                SILVER_BULLETS_ITERATE_STRUCT_ACCESS_SOME_FIELDS, \
+                SILVER_BULLETS_ITERATE_STRUCT_ACCESS_NO_FIELDS)(instance, ##__VA_ARGS__)
 
 // https://stackoverflow.com/questions/27765387/distributing-an-argument-in-a-variadic-macro
 #define SILVER_BULLETS_ITERATE_STRUCT_SIMPLE_STRINGIZE(x) #x
@@ -151,10 +158,12 @@ inline auto asTuple(S& s, std::enable_if_t<has_iterate_struct_helper_v<std::deca
         template <> class iterate_struct_helper<Struct> { public: \
             using S = Struct; \
             static auto asTuple(S& s) { \
-                return std::forward_as_tuple(SILVER_BULLETS_ITERATE_STRUCT_ACCESS_FIELDS(s, __VA_ARGS__)); \
+                (void)s; \
+                return std::forward_as_tuple(SILVER_BULLETS_ITERATE_STRUCT_ACCESS_FIELDS(s, ##__VA_ARGS__)); \
             } \
             static auto asTuple(const S& s) { \
-                return std::forward_as_tuple(SILVER_BULLETS_ITERATE_STRUCT_ACCESS_FIELDS(s, __VA_ARGS__)); \
+                (void)s; \
+                return std::forward_as_tuple(SILVER_BULLETS_ITERATE_STRUCT_ACCESS_FIELDS(s, ##__VA_ARGS__)); \
             } \
             static constexpr const char *fieldNames[] = { \
                 SILVER_BULLETS_ITERATE_STRUCT_STRINGIZE_FIELDS(__VA_ARGS__) \
@@ -183,10 +192,12 @@ inline auto asTuple(S& s, std::enable_if_t<has_iterate_struct_helper_v<std::deca
         class iterate_struct_helper<Struct<SILVER_BULLETS_ITERATE_STRUCT_TEMPLATE_ARGUMENTS(BOOST_PP_TUPLE_TO_SEQ(TemplateParameters))>> { public: \
             using S = Struct<SILVER_BULLETS_ITERATE_STRUCT_TEMPLATE_ARGUMENTS(BOOST_PP_TUPLE_TO_SEQ(TemplateParameters))>; \
             static auto asTuple(S& s) { \
-                return std::forward_as_tuple(SILVER_BULLETS_ITERATE_STRUCT_ACCESS_FIELDS(s, __VA_ARGS__)); \
+                (void)s; \
+                return std::forward_as_tuple(SILVER_BULLETS_ITERATE_STRUCT_ACCESS_FIELDS(s, ##__VA_ARGS__)); \
             } \
             static auto asTuple(const S& s) { \
-                return std::forward_as_tuple(SILVER_BULLETS_ITERATE_STRUCT_ACCESS_FIELDS(s, __VA_ARGS__)); \
+                (void)s; \
+                return std::forward_as_tuple(SILVER_BULLETS_ITERATE_STRUCT_ACCESS_FIELDS(s, ##__VA_ARGS__)); \
             } \
             static constexpr const char *fieldNames[] = { \
                 SILVER_BULLETS_ITERATE_STRUCT_STRINGIZE_FIELDS(__VA_ARGS__) \
