@@ -9,6 +9,7 @@
 #include <boost/preprocessor/variadic/to_seq.hpp>
 #include <boost/preprocessor/comma_if.hpp>
 #include <boost/preprocessor/arithmetic/sub.hpp>
+#include <boost/version.hpp>
 
 namespace silver_bullets {
 namespace iterate_struct {
@@ -129,8 +130,27 @@ inline auto asTuple(S& s, std::enable_if_t<has_iterate_struct_helper_v<std::deca
 } // namespace iterate_struct
 } // namespace silver_bullets
 
+// NOTE
+//  In Boost up to 1.74, BOOST_PP_SEQ_FOR_EACH passes 2 as first element index,
+//  whereas in later Boost versions (starting from 1.75), it's 1.
+#if BOOST_VERSION < 107500
+#define SILVER_BULLETS_ITERATE_STRUCT_FIRST_SEQ_ITEM_INDEX 2
+#else // BOOST_VERSION
+#define SILVER_BULLETS_ITERATE_STRUCT_FIRST_SEQ_ITEM_INDEX 1
+#endif // BOOST_VERSION
+
+#define SILVER_BULLETS_ITERATE_STRUCT_SEQ_ITEM_INDEX(R, _, __) R
+static_assert(BOOST_PP_SEQ_FOR_EACH(SILVER_BULLETS_ITERATE_STRUCT_SEQ_ITEM_INDEX, _, ()) ==
+              SILVER_BULLETS_ITERATE_STRUCT_FIRST_SEQ_ITEM_INDEX,
+              "Mismatch of guessed and actual first sequence item index when "
+              "using BOOST_PP_SEQ_FOR_EACH. "
+              "Update SILVER_BULLETS_ITERATE_STRUCT_FIRST_SEQ_ITEM_INDEX definition");
+
 // See https://stackoverflow.com/questions/27765387/distributing-an-argument-in-a-variadic-macro
-#define SILVER_BULLETS_ITERATE_STRUCT_ACCESS_FIELD(r, instance, field) BOOST_PP_COMMA_IF(BOOST_PP_SUB(r, 2)) instance.field
+#define SILVER_BULLETS_ITERATE_STRUCT_ACCESS_FIELD(r, instance, field)      \
+    BOOST_PP_COMMA_IF(                                                      \
+        BOOST_PP_SUB(r, SILVER_BULLETS_ITERATE_STRUCT_FIRST_SEQ_ITEM_INDEX))\
+    instance.field
 
 #define SILVER_BULLETS_ITERATE_STRUCT_ACCESS_SOME_FIELDS(instance, ...) \
     BOOST_PP_SEQ_FOR_EACH(SILVER_BULLETS_ITERATE_STRUCT_ACCESS_FIELD, \
@@ -145,7 +165,9 @@ inline auto asTuple(S& s, std::enable_if_t<has_iterate_struct_helper_v<std::deca
 
 // https://stackoverflow.com/questions/27765387/distributing-an-argument-in-a-variadic-macro
 #define SILVER_BULLETS_ITERATE_STRUCT_SIMPLE_STRINGIZE(x) #x
-#define SILVER_BULLETS_ITERATE_STRUCT_STRINGIZE_FIELD(r, data, field)BOOST_PP_COMMA_IF(BOOST_PP_SUB(r, 2)) \
+#define SILVER_BULLETS_ITERATE_STRUCT_STRINGIZE_FIELD(r, data, field)       \
+    BOOST_PP_COMMA_IF(                                                      \
+        BOOST_PP_SUB(r, SILVER_BULLETS_ITERATE_STRUCT_FIRST_SEQ_ITEM_INDEX))\
     SILVER_BULLETS_ITERATE_STRUCT_SIMPLE_STRINGIZE(field)
 
 #define SILVER_BULLETS_ITERATE_STRUCT_STRINGIZE_FIELDS(...) \
@@ -173,14 +195,18 @@ inline auto asTuple(S& s, std::enable_if_t<has_iterate_struct_helper_v<std::deca
 
 
 
-#define SILVER_BULLETS_ITERATE_STRUCT_TEMPLATE_PARAMETER(r, data, elem) \
-    BOOST_PP_COMMA_IF(BOOST_PP_SUB(r,2)) BOOST_PP_TUPLE_ELEM(2, 0, elem) BOOST_PP_TUPLE_ELEM(2, 1, elem)
+#define SILVER_BULLETS_ITERATE_STRUCT_TEMPLATE_PARAMETER(r, data, elem)     \
+    BOOST_PP_COMMA_IF(                                                      \
+        BOOST_PP_SUB(r, SILVER_BULLETS_ITERATE_STRUCT_FIRST_SEQ_ITEM_INDEX))\
+    BOOST_PP_TUPLE_ELEM(2, 0, elem) BOOST_PP_TUPLE_ELEM(2, 1, elem)
 
 #define SILVER_BULLETS_ITERATE_STRUCT_TEMPLATE_PARAMETERS(seq) \
     BOOST_PP_SEQ_FOR_EACH(SILVER_BULLETS_ITERATE_STRUCT_TEMPLATE_PARAMETER, _, seq)
 
-#define SILVER_BULLETS_ITERATE_STRUCT_TEMPLATE_ARGUMENT(r, data, elem) \
-    BOOST_PP_COMMA_IF(BOOST_PP_SUB(r,2)) BOOST_PP_TUPLE_ELEM(2, 1, elem)
+#define SILVER_BULLETS_ITERATE_STRUCT_TEMPLATE_ARGUMENT(r, data, elem)      \
+    BOOST_PP_COMMA_IF(                                                      \
+        BOOST_PP_SUB(r, SILVER_BULLETS_ITERATE_STRUCT_FIRST_SEQ_ITEM_INDEX))\
+    BOOST_PP_TUPLE_ELEM(2, 1, elem)
 
 #define SILVER_BULLETS_ITERATE_STRUCT_TEMPLATE_ARGUMENTS(seq) \
     BOOST_PP_SEQ_FOR_EACH(SILVER_BULLETS_ITERATE_STRUCT_TEMPLATE_ARGUMENT, _, seq)
